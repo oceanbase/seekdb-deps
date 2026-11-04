@@ -1,10 +1,16 @@
 # Build output
 build/
+dist/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 compile_commands.json
+
+# Keep package build recipes while ignoring generated files in build directories.
+!packages/**/build/
+packages/**/build/*
+!packages/**/build/*.sh
 
 # Compiled artifacts
 *.o
