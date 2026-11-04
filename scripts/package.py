@@ -121,9 +121,10 @@ def make_archive(stage, output):
         output.unlink(missing_ok=True)
         raise RuntimeError("tar/zstd failed while creating " + str(output))
     digest = sha256(output)
-    output.with_name(output.name + ".sha256").write_text(
-        f"{digest}  {output.name}\n", encoding="ascii"
-    )
+    checksum_path = output.with_name(output.name + ".sha256")
+    checksum_path.write_text(f"{digest}  {output.name}\n", encoding="ascii")
+    output.chmod(0o644)
+    checksum_path.chmod(0o644)
 
 
 def profile_for_target(target):
