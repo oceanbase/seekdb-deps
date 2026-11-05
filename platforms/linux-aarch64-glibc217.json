@@ -1,0 +1,16 @@
+{
+  "id": "linux-aarch64-glibc217",
+  "family": "linux",
+  "architecture": "arm64",
+  "cflags": ["-O2", "-fPIC", "-march=armv8-a"],
+  "hosts": [
+    {
+      "os": "linux",
+      "architectures": ["arm64"]
+    }
+  ],
+  "abi": {
+    "libc": "glibc",
+    "minimum_libc_version": "2.17"
+  }
+}
