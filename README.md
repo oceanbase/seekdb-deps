@@ -15,7 +15,7 @@ scripts/
   init_build_env.py       shared compiler and SDK environment initialization
   build.py                shared target handling and RecipeContext
   archive.py              manifests, deterministic tar.gz, and SHA256
-platforms/<target>.json   target ABI and supported build hosts
+platforms/<target>.json   target ABI, C flags, and supported build hosts
 ```
 
 Package recipes use `RecipeContext.cmake(...)` for the configure/build lifecycle, `ctx.run(...)` for an upstream-specific command, and `ctx.install(source, relative_path)` to add an output to the package. They do not manage temporary directories, patches, license placement, manifests, checksums, or archives. The package runner initializes the build environment before downloading source or invoking a recipe. `scripts/init_build_env.py` selects or loads host compiler settings, checks minimum tool versions, and prepares the target-specific CMake arguments.
@@ -58,7 +58,7 @@ The initial profiles cover these build configurations:
 | `windows-x86_64-md` | Windows x86_64 | x86_64, dynamic MSVC runtime (`/MD`) |
 | `android-arm64-v8a-api26` | Linux, macOS, or Windows x86_64 | arm64-v8a, Android API 26 |
 
-Profiles describe target ABI and supported build hosts, not the compiler used to produce a package. The shared initializer honors `CC` and `CXX` when supplied and otherwise selects host defaults; Linux compilers must be version 9.4.0 or newer, and the Windows C++ toolset must be 14.30 or newer. Linux builds use a glibc 2.32-or-older host so the resulting package stays within its declared ABI baseline. The initializer loads the Visual Studio developer environment when needed. For Android, set `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`; the NDK must be 27.2.12479018 or newer, while the profile records only ABI and API level. macOS builds require the Xcode command line tools. The actual compiler and SDK versions are recorded in the package manifest for provenance.
+Profiles describe target ABI, target C flags where applicable, and supported build hosts, not the compiler used to produce a package. The shared initializer reads profile flags and passes the effective value to CMake; it does not define a second platform-specific CFLAGS value. It honors `CC` and `CXX` when supplied and otherwise selects host defaults; Linux compilers must be version 9.4.0 or newer, and the Windows C++ toolset must be 14.30 or newer. Linux builds use a glibc 2.32-or-older host so the resulting package stays within its declared ABI baseline. The initializer loads the Visual Studio developer environment when needed. For Android, set `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`; the NDK must be 27.2.12479018 or newer, while the profile records only ABI and API level. macOS builds require the Xcode command line tools. The actual compiler and SDK versions are recorded in the package manifest for provenance.
 
 Profiles are build contracts, not validation claims. The zlib 1.2.13 recipe currently builds only upstream's `zlibstatic` target and stages the static library and public headers. The Linux zlib binary was built in the previous sample revision on Linux x86_64 with glibc 2.32 and GCC 9.4.0; the current environment-initialization and profile refactor has not been built. macOS, Windows, and Android profiles also remain unbuilt.
 

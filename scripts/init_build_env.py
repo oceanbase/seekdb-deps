@@ -13,7 +13,6 @@ MINIMUM_CMAKE_VERSION = (3, 22, 1)
 MINIMUM_LINUX_COMPILER_VERSION = (9, 4, 0)
 MINIMUM_WINDOWS_TOOLSET_VERSION = (14, 30)
 MINIMUM_ANDROID_NDK_REVISION = (27, 2, 12479018)
-COMMON_COMPILE_FLAGS = "-O2 -fPIC"
 
 
 def _run(argv, *, env=None, capture=False, check=True, text=True):
@@ -81,6 +80,13 @@ def _require_build_tools(env):
 
 def _join_flags(*values):
     return " ".join(value.strip() for value in values if value and value.strip())
+
+
+def _profile_flags(profile, name):
+    flags = profile.get(name, [])
+    if not isinstance(flags, list) or any(not isinstance(flag, str) for flag in flags):
+        raise ValueError("Target profile field '{}' must be a list of strings".format(name))
+    return " ".join(flag.strip() for flag in flags if flag.strip())
 
 
 def _windows_developer_environment(env):
@@ -222,11 +228,7 @@ def initialize_build_environment(profile):
                     c_compiler["version"], cxx_compiler["version"]
                 )
             )
-        cflags = _join_flags(
-            COMMON_COMPILE_FLAGS,
-            "-march={}".format(abi["cpu_baseline"]),
-            env.get("CFLAGS", ""),
-        )
+        cflags = _join_flags(_profile_flags(profile, "cflags"), env.get("CFLAGS", ""))
         cxxflags = _join_flags(abi.get("cxxflags", ""), env.get("CXXFLAGS", ""))
         args.extend([
             "-DCMAKE_C_COMPILER={}".format(c_compiler["path"]),
@@ -247,7 +249,7 @@ def initialize_build_environment(profile):
         cxx_compiler, cxx_version = _compiler_info(env["CXX"], env)
         sdk_path = _run(["xcrun", "--sdk", "macosx", "--show-sdk-path"], env=env, capture=True).strip()
         sdk_version = _run(["xcrun", "--sdk", "macosx", "--show-sdk-version"], env=env, capture=True).strip()
-        cflags = env.get("CFLAGS", "")
+        cflags = _join_flags(_profile_flags(profile, "cflags"), env.get("CFLAGS", ""))
         cxxflags = env.get("CXXFLAGS", "")
         args.extend([
             "-DCMAKE_C_COMPILER={}".format(c_compiler["path"]),
