@@ -7,6 +7,7 @@ import platform
 import re
 import shutil
 import subprocess
+import tempfile
 
 
 MINIMUM_CMAKE_VERSION = (3, 22, 1)
@@ -107,13 +108,25 @@ def _windows_developer_environment(env):
     if not developer_command.is_file():
         raise ValueError("Visual Studio developer command was not found: " + str(developer_command))
 
-    command = 'call "{}" -arch=x64 -host_arch=x64 >nul && set'.format(developer_command)
-    result = subprocess.run(
-        ["cmd.exe", "/d", "/u", "/s", "/c", command],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    command_environment = dict(env)
+    command_environment["SEEKDB_INTERNAL_VSDEVCMD"] = str(developer_command)
+    with tempfile.TemporaryDirectory(prefix="seekdb-vsdevcmd-") as temporary_directory:
+        command_script = Path(temporary_directory) / "initialize.cmd"
+        command_script.write_text(
+            "@echo off\r\n"
+            'call "%SEEKDB_INTERNAL_VSDEVCMD%" -arch=x64 -host_arch=x64 >nul\r\n'
+            "if errorlevel 1 exit /b %errorlevel%\r\n"
+            "set\r\n",
+            encoding="ascii",
+        )
+        result = subprocess.run(
+            ["cmd.exe", "/d", "/u", "/c", command_script.name],
+            cwd=temporary_directory,
+            env=command_environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
     if result.returncode:
         message = result.stderr.decode("utf-16le", errors="replace").strip()
         raise ValueError("Visual Studio developer environment initialization failed: " + message)
@@ -124,6 +137,7 @@ def _windows_developer_environment(env):
             continue
         key, value = line.split("=", 1)
         initialized[key] = value
+    initialized.pop("SEEKDB_INTERNAL_VSDEVCMD", None)
     if not initialized.get("VSCMD_VER"):
         raise ValueError("Visual Studio developer environment initialization failed")
     return initialized
