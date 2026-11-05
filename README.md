@@ -1,6 +1,6 @@
 # seekdb-deps
 
-This repository contains pinned third-party source archive references, package-specific build recipes, and patches maintained for SeekDB. One package version lives under `packages/<name>/<version>/`; shared download, build, and archive behavior lives under `scripts/`.
+This repository contains pinned third-party source archive references, package-specific build recipes, and patches maintained for seekdb. One package version lives under `packages/<name>/<version>/`; shared download, build, and archive behavior lives under `scripts/`.
 
 ## Layout
 
