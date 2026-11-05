@@ -61,7 +61,7 @@ The initial profiles cover these build configurations:
 
 Profiles describe target ABI, target C flags where applicable, and supported build hosts, not the compiler used to produce a package. The shared initializer reads profile flags and passes the effective value to CMake; it does not define a second platform-specific CFLAGS value. It honors `CC` and `CXX` when supplied and otherwise selects host defaults; Linux compilers must be version 9.4.0 or newer, and the Windows C++ toolset must be 14.30 or newer. Linux builds use glibc 2.17-or-older build environments; the workflow uses native x86_64 and aarch64 runners with matching manylinux2014 images. The initializer loads the Visual Studio developer environment when needed. For Android, set `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`; the NDK must be 27.2.12479018 or newer, while the profile records only ABI and API level. macOS builds require the Xcode command line tools. The actual compiler and SDK versions are recorded in the package manifest for provenance.
 
-Profiles are build contracts, not validation claims. The zlib 1.4 recipe builds only upstream's `zlibstatic` target and stages the static library and public headers. The `1.2.13` package remains available to reproduce the initial sample. Linux aarch64, macOS, Windows, and Android profiles have not been built.
+Profiles are build contracts, not validation claims. The zlib 1.4 recipe builds only upstream's `zlibstatic` target and stages the static library and public headers. Linux aarch64, macOS, Windows, and Android profiles have not been built.
 
 ## Licensing
 
