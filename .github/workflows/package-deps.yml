@@ -1,0 +1,194 @@
+name: Build dependency packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package name under packages/
+        type: string
+        required: true
+        default: zlib
+      version:
+        description: Package version under packages/<name>/
+        type: string
+        required: true
+        default: 1.2.13
+      kind:
+        description: Artifact types to build
+        type: choice
+        required: true
+        default: both
+        options:
+          - source
+          - binary
+          - both
+      target:
+        description: Binary target, or all supported targets. Ignored for source-only builds.
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - linux-x86_64-glibc217
+          - linux-aarch64-glibc217
+          - macos-arm64-min13
+          - windows-x86_64-md
+          - android-arm64-v8a-api26
+      date:
+        description: Artifact date in YYYYMMDD format. Empty uses the current UTC date.
+        type: string
+        required: false
+        default: ''
+      jobs:
+        description: Parallel build jobs per binary target
+        type: number
+        required: true
+        default: 2
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      release_date: ${{ steps.inputs.outputs.release_date }}
+      repo_sha_short: ${{ steps.inputs.outputs.repo_sha_short }}
+      targets: ${{ steps.inputs.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: inputs
+        env:
+          REQUESTED_TARGET: ${{ inputs.target }}
+          REQUESTED_DATE: ${{ inputs.date }}
+          REPOSITORY_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/prepare_package_matrix.py
+
+  source:
+    if: ${{ inputs.kind == 'source' || inputs.kind == 'both' }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Build source package
+        env:
+          PACKAGE_NAME: ${{ inputs.package }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+          RELEASE_DATE: ${{ needs.prepare.outputs.release_date }}
+        run: >-
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
+          --kind source --date "$RELEASE_DATE" --output dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.package }}-${{ inputs.version }}-source-${{ needs.prepare.outputs.release_date }}-${{ needs.prepare.outputs.repo_sha_short }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  binary:
+    if: ${{ inputs.kind == 'binary' || inputs.kind == 'both' }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.prepare.outputs.targets) }}
+    name: Build ${{ matrix.target.id }}
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      PACKAGE_NAME: ${{ inputs.package }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      RELEASE_DATE: ${{ needs.prepare.outputs.release_date }}
+      BUILD_JOBS: ${{ inputs.jobs }}
+      TARGET_PROFILE: ${{ matrix.target.id }}
+      LINUX_BUILD_IMAGE: ${{ matrix.target.container_image || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        if: ${{ matrix.target.family != 'linux' }}
+        with:
+          python-version: '3.11'
+
+      - name: Install CMake and Ninja
+        if: ${{ matrix.target.family != 'linux' }}
+        run: python -m pip install --disable-pip-version-check cmake ninja
+
+      - uses: actions/setup-java@v6
+        if: ${{ matrix.target.family == 'android' }}
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+        if: ${{ matrix.target.family == 'android' }}
+
+      - name: Install the required Android NDK
+        if: ${{ matrix.target.family == 'android' }}
+        shell: bash
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$sdk_root" ]; then
+            echo "Android SDK root is not set" >&2
+            exit 1
+          fi
+          sdkmanager --install "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$sdk_root/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build Linux binary
+        if: ${{ matrix.target.family == 'linux' }}
+        shell: bash
+        run: |
+          docker run --rm \
+            --env PACKAGE_NAME \
+            --env PACKAGE_VERSION \
+            --env RELEASE_DATE \
+            --env BUILD_JOBS \
+            --env TARGET_PROFILE \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace \
+            "$LINUX_BUILD_IMAGE" \
+            /bin/bash -lc '
+              git config --global --add safe.directory /workspace
+              python=/opt/python/cp311-cp311/bin/python
+              "$python" -m pip install --disable-pip-version-check ninja
+              export PATH="/opt/python/cp311-cp311/bin:$PATH"
+              "$python" scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION" \
+                --kind binary --target "$TARGET_PROFILE" \
+                --date "$RELEASE_DATE" --jobs "$BUILD_JOBS" --output dist
+            '
+
+      - name: Build macOS binary
+        if: ${{ matrix.target.family == 'macos' }}
+        run: >-
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
+          --kind binary --target macos-arm64-min13 --date "$RELEASE_DATE"
+          --jobs "$BUILD_JOBS" --output dist
+
+      - name: Build Windows binary
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        run: >-
+          python scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
+          --kind binary --target windows-x86_64-md --date $env:RELEASE_DATE
+          --jobs $env:BUILD_JOBS --output dist
+
+      - name: Build Android binary
+        if: ${{ matrix.target.family == 'android' }}
+        run: >-
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
+          --kind binary --target android-arm64-v8a-api26 --date "$RELEASE_DATE"
+          --jobs "$BUILD_JOBS" --output dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.package }}-${{ inputs.version }}-${{ matrix.target.id }}-${{ needs.prepare.outputs.release_date }}-${{ needs.prepare.outputs.repo_sha_short }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0

@@ -1,0 +1,15 @@
+{
+  "id": "windows-x86_64-md",
+  "family": "windows",
+  "architecture": "x86_64",
+  "hosts": [
+    {
+      "os": "windows",
+      "architectures": ["x86_64"]
+    }
+  ],
+  "abi": {
+    "runtime": "MD",
+    "runtime_library": "MultiThreadedDLL"
+  }
+}

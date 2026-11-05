@@ -1,0 +1,22 @@
+{
+  "id": "android-arm64-v8a-api26",
+  "family": "android",
+  "architecture": "arm64-v8a",
+  "hosts": [
+    {
+      "os": "linux",
+      "architectures": ["x86_64"]
+    },
+    {
+      "os": "macos",
+      "architectures": ["x86_64", "arm64"]
+    },
+    {
+      "os": "windows",
+      "architectures": ["x86_64"]
+    }
+  ],
+  "abi": {
+    "api_level": 26
+  }
+}
