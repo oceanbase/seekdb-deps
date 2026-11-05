@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "name": "zlib",
+  "version": "1.4",
+  "source": {
+    "path": "source",
+    "url": "https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.gz",
+    "repository": "https://github.com/madler/zlib.git",
+    "tag": "v1.4",
+    "revision": "99623ef7097352da7993ba614161fd6a311e046e",
+    "archive_sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
+    "strip_prefix": "zlib-1.4"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Zlib",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/zlib.h",
+      "include/zconf.h",
+      "lib/libz.a"
+    ],
+    "windows": [
+      "include/zlib.h",
+      "include/zconf.h",
+      "lib/libzs.lib"
+    ]
+  }
+}
