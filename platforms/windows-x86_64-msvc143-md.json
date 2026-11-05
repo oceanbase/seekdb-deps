@@ -1,0 +1,19 @@
+{
+  "id": "windows-x86_64-msvc143-md",
+  "family": "windows",
+  "architecture": "x86_64",
+  "hosts": [
+    {
+      "os": "windows",
+      "architectures": ["x86_64"]
+    }
+  ],
+  "toolchain": {
+    "kind": "msvc",
+    "toolset": "v143",
+    "toolset_major": 14,
+    "toolset_minimum_minor": 30,
+    "runtime": "MD",
+    "runtime_library": "MultiThreadedDLL"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "android-arm64-v8a-api26-ndk27",
+  "family": "android",
+  "architecture": "arm64-v8a",
+  "hosts": [
+    {
+      "os": "linux",
+      "architectures": ["x86_64"]
+    },
+    {
+      "os": "macos",
+      "architectures": ["x86_64", "arm64"]
+    },
+    {
+      "os": "windows",
+      "architectures": ["x86_64"]
+    }
+  ],
+  "toolchain": {
+    "kind": "android-ndk",
+    "ndk_revision": "27.2.12479018",
+    "api_level": 26
+  }
+}

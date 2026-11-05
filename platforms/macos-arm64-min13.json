@@ -1,0 +1,16 @@
+{
+  "id": "macos-arm64-min13",
+  "family": "macos",
+  "architecture": "arm64",
+  "hosts": [
+    {
+      "os": "macos",
+      "architectures": ["arm64"]
+    }
+  ],
+  "toolchain": {
+    "kind": "apple",
+    "compiler": "clang",
+    "deployment_target": "13.0"
+  }
+}

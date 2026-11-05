@@ -1,0 +1,20 @@
+{
+  "id": "linux-x86_64-glibc232-gcc9",
+  "family": "linux",
+  "architecture": "x86_64",
+  "hosts": [
+    {
+      "os": "linux",
+      "architectures": ["x86_64"]
+    }
+  ],
+  "toolchain": {
+    "kind": "gnu",
+    "c_compiler": "gcc",
+    "cxx_compiler": "g++",
+    "compiler_version": "9.4.0",
+    "libc": "glibc",
+    "builder_libc_version": "2.32",
+    "cflags": "-O2 -fPIC -march=x86-64"
+  }
+}
