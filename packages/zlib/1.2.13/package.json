@@ -4,9 +4,12 @@
   "version": "1.2.13",
   "source": {
     "path": "source",
+    "url": "https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz",
     "repository": "https://github.com/madler/zlib.git",
     "tag": "v1.2.13",
-    "revision": "04f42ceca40f73e2978b50e93806c2a18c1281fc"
+    "revision": "04f42ceca40f73e2978b50e93806c2a18c1281fc",
+    "archive_sha256": "b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30",
+    "strip_prefix": "zlib-1.2.13"
   },
   "recipe": "recipes/build.py",
   "patches": [],

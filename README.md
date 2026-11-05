@@ -1,15 +1,15 @@
 # seekdb-deps
 
-This repository contains pinned third-party dependency sources, package-specific build recipes, and patches maintained for SeekDB. One package version lives under `packages/<name>/<version>/`; shared build and archive behavior lives under `scripts/`.
+This repository contains pinned third-party source archive references, package-specific build recipes, and patches maintained for SeekDB. One package version lives under `packages/<name>/<version>/`; shared download, build, and archive behavior lives under `scripts/`.
 
 ## Layout
 
 ```text
 packages/<name>/<version>/
-  source/                 pinned upstream source or submodule
   recipes/build.py        only package-specific build and file selection
   patches/                ordered package patches, when needed
-  package.json            source pin, license, recipe, and expected outputs
+  package.json            source URL, revision, archive checksum, license, and outputs
+  source/                 fetched source; included in source bundles, not stored in Git
 scripts/
   package.py              source/binary release orchestration
   build.py                shared target handling and RecipeContext
@@ -23,7 +23,7 @@ Binary archives have one package-version directory containing relative `include/
 
 ## Build and package
 
-The command requires Python 3.8 or newer. Binary builds also require CMake 3.22.1 or newer and Ninja. `--kind source` creates a source bundle without a compiler or target; the bundle includes its package source, recipe, target profiles, and shared runner, so it can build a binary package after extraction.
+The command requires Python 3.8 or newer. Binary builds also require CMake 3.22.1 or newer and Ninja. The package runner downloads each package's HTTPS source archive, checks its SHA256, and extracts the declared top-level directory. `--kind source` creates a source bundle without a compiler or target; the bundle includes the verified package source, recipe, target profiles, and shared runner, so it can build a binary package after extraction without network access.
 
 ```sh
 # Source bundle only; no target or compiler is needed.

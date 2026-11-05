@@ -7,13 +7,16 @@ import hashlib
 import importlib.util
 import json
 import os
+import posixpath
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from pathlib import PurePosixPath
+from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,11 +72,18 @@ def package_paths(name, version):
     for field in ("source", "recipe", "license", "required_artifacts"):
         if field not in metadata:
             raise ValueError("Package metadata is missing field: " + field)
-    for field in ("path", "repository", "tag", "revision"):
+    for field in ("path", "url", "repository", "tag", "revision", "archive_sha256", "strip_prefix"):
         if field not in metadata["source"]:
             raise ValueError("Package source metadata is missing field: " + field)
-    if not re.match(r"^[0-9a-fA-F]{40,64}$", metadata["source"]["revision"]):
+    source = metadata["source"]
+    if not source["url"].startswith("https://"):
+        raise ValueError("Package source URL must use HTTPS")
+    safe_relative(source["path"], "source.path")
+    safe_relative(source["strip_prefix"], "source.strip_prefix")
+    if not re.match(r"^[0-9a-fA-F]{40,64}$", source["revision"]):
         raise ValueError("Package source revision must be a Git object id")
+    if not re.match(r"^[0-9a-fA-F]{64}$", source["archive_sha256"]):
+        raise ValueError("Package source archive_sha256 must be a SHA256 digest")
     for field in ("spdx_id", "source_path"):
         if field not in metadata["license"]:
             raise ValueError("Package license metadata is missing field: " + field)
@@ -104,42 +114,137 @@ def repository_commit():
     return run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture=True), True
 
 
-def source_revision(package_root, metadata, repo_checkout):
+def download_source_archive(source, workspace):
+    archive_path = workspace / "upstream-source.tar.gz"
+    request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
+    with urlopen(request, timeout=120) as response:
+        if not response.geturl().startswith("https://"):
+            raise ValueError("Package source download did not remain on HTTPS")
+        with archive_path.open("wb") as output:
+            shutil.copyfileobj(response, output)
+
+    actual_sha256 = sha256(archive_path)
+    expected_sha256 = source["archive_sha256"].lower()
+    if actual_sha256 != expected_sha256:
+        archive_path.unlink()
+        raise ValueError(
+            "Downloaded source SHA256 mismatch: expected {}, found {}".format(
+                expected_sha256, actual_sha256
+            )
+        )
+    return archive_path
+
+
+def extract_source_archive(archive_path, destination, strip_prefix):
+    prefix = PurePosixPath(strip_prefix).parts
+    destination.mkdir(parents=True)
+    with tarfile.open(str(archive_path), mode="r:*") as archive:
+        entries = []
+        seen = {}
+        symlink_paths = set()
+        found_prefix = False
+        for member in archive.getmembers():
+            name = PurePosixPath(member.name)
+            if (not member.name or "\\" in member.name or name.is_absolute()
+                    or any(part == ".." for part in name.parts)
+                    or (name.parts and re.match(r"^[A-Za-z]:", name.parts[0]))):
+                raise ValueError("Unsafe path in upstream source archive: " + member.name)
+            if name.parts[:len(prefix)] != prefix:
+                raise ValueError("Unexpected path in upstream source archive: " + member.name)
+            found_prefix = True
+            relative_parts = name.parts[len(prefix):]
+            if not relative_parts:
+                if not member.isdir():
+                    raise ValueError("Source archive root is not a directory")
+                continue
+            relative = PurePosixPath(*relative_parts)
+            if any(re.match(r"^[A-Za-z]:", part) for part in relative.parts):
+                raise ValueError("Unsafe path in upstream source archive: " + member.name)
+            if member.isdir():
+                kind = "directory"
+            elif member.isfile():
+                kind = "file"
+            elif member.issym():
+                linkname = member.linkname
+                if not linkname or "\\" in linkname or PurePosixPath(linkname).is_absolute():
+                    raise ValueError("Unsafe symlink in upstream source archive: " + member.name)
+                resolved = PurePosixPath(posixpath.normpath(
+                    posixpath.join(relative.parent.as_posix(), linkname)
+                ))
+                if resolved.parts and resolved.parts[0] == "..":
+                    raise ValueError("Upstream source symlink escapes source root: " + member.name)
+                kind = "symlink"
+                symlink_paths.add(relative)
+            else:
+                raise ValueError("Unsupported entry in upstream source archive: " + member.name)
+            if relative in seen and not (kind == "directory" and seen[relative] == "directory"):
+                raise ValueError("Duplicate path in upstream source archive: " + member.name)
+            seen[relative] = kind
+            entries.append((member, relative, kind))
+
+        if not found_prefix:
+            raise ValueError("Source archive does not contain strip_prefix " + strip_prefix)
+        for _, relative, _ in entries:
+            parent = relative.parent
+            while parent != PurePosixPath("."):
+                if parent in symlink_paths:
+                    raise ValueError("Upstream source archive contains a symlink parent: " + str(relative))
+                parent = parent.parent
+
+        entries.sort(key=lambda item: (0 if item[2] == "directory" else 1 if item[2] == "file" else 2,
+                                       len(item[1].parts), item[1].as_posix()))
+        for member, relative, kind in entries:
+            output_path = destination.joinpath(*relative.parts)
+            if kind == "directory":
+                output_path.mkdir(parents=True, exist_ok=True)
+            elif kind == "file":
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise ValueError("Unable to read upstream source archive file: " + member.name)
+                with stream, output_path.open("wb") as output:
+                    shutil.copyfileobj(stream, output)
+                if os.name != "nt":
+                    output_path.chmod(member.mode & 0o777)
+            else:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(member.linkname, str(output_path), target_is_directory=False)
+    return destination
+
+
+def source_revision(package_root, metadata, repo_checkout, workspace):
     source = metadata["source"]
     source_dir = (package_root / safe_relative(source["path"], "source.path")).resolve()
     try:
         source_dir.relative_to(package_root.resolve())
     except ValueError:
         raise ValueError("Upstream source path escapes package directory")
-    if not source_dir.is_dir():
-        raise ValueError("Pinned upstream source is missing: " + str(source_dir))
     if not repo_checkout:
         document = verify_manifest(ROOT, expected_type="source")
         upstream = document.get("upstream", {})
-        if upstream.get("revision") != source["revision"]:
-            raise ValueError("Source bundle and package metadata upstream revisions do not match")
+        if (upstream.get("revision") != source["revision"]
+                or upstream.get("archive_sha256") != source["archive_sha256"]):
+            raise ValueError("Source bundle and package metadata upstream pins do not match")
+        if not source_dir.is_dir():
+            raise ValueError("Pinned upstream source is missing: " + str(source_dir))
         return source["revision"], source_dir
 
-    relative = source_dir.relative_to(ROOT).as_posix()
-    tree_entry = run(["git", "ls-tree", "HEAD", "--", relative], cwd=ROOT, capture=True)
-    parts = tree_entry.split()
-    if len(parts) < 3 or parts[0] != "160000" or parts[1] != "commit":
-        raise ValueError("Source path is not a committed Git submodule: " + relative)
-    pinned_revision = parts[2]
-    checked_out_revision = run(["git", "-C", str(source_dir), "rev-parse", "HEAD"], capture=True)
-    if pinned_revision != checked_out_revision or pinned_revision != source["revision"]:
-        raise ValueError("Submodule, package metadata, and upstream revision do not match")
-    upstream_url = run(
-        ["git", "-C", str(source_dir), "config", "--get", "remote.origin.url"], capture=True
-    )
-    if upstream_url != source["repository"]:
-        raise ValueError("Submodule URL and package metadata do not match")
-    status = run(
-        ["git", "-C", str(source_dir), "status", "--porcelain", "--untracked-files=all"], capture=True
-    )
-    if status:
-        raise ValueError("Upstream source submodule has local changes")
-    return pinned_revision, source_dir
+    workspace.mkdir(parents=True, exist_ok=True)
+    archive_path = download_source_archive(source, workspace)
+    source_dir = workspace / "source"
+    extract_source_archive(archive_path, source_dir, source["strip_prefix"])
+    return source["revision"], source_dir
+
+
+def upstream_record(metadata, source_revision_sha):
+    source = metadata["source"]
+    return {
+        "repository": source["repository"],
+        "url": source["url"],
+        "tag": source["tag"],
+        "revision": source_revision_sha,
+        "archive_sha256": source["archive_sha256"],
+    }
 
 
 def patch_records(package_root, metadata):
@@ -194,6 +299,13 @@ def source_artifact(package_root, metadata, source_revision_sha, source_dir,
     root = output_dir / "seekdb-deps-{}-{}".format(name, version)
     root.mkdir(parents=True)
     copy_repository_inputs(root, package_root)
+    source_destination = root / "packages" / package_root.relative_to(ROOT / "packages")
+    source_destination = source_destination / safe_relative(metadata["source"]["path"], "source.path")
+    if source_destination.is_symlink():
+        source_destination.unlink()
+    elif source_destination.exists():
+        shutil.rmtree(str(source_destination))
+    copy_tree(source_dir, source_destination)
     document = {
         "schema_version": 1,
         "name": name,
@@ -201,11 +313,7 @@ def source_artifact(package_root, metadata, source_revision_sha, source_dir,
         "artifact_type": "source",
         "release_date": release_date,
         "seekdb_deps_commit": repo_sha,
-        "upstream": {
-            "repository": metadata["source"]["repository"],
-            "tag": metadata["source"]["tag"],
-            "revision": source_revision_sha,
-        },
+        "upstream": upstream_record(metadata, source_revision_sha),
         "patches": patch_records(package_root, metadata),
         "license": metadata["license"],
     }
@@ -286,11 +394,7 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
         "artifact_type": "binary",
         "release_date": release_date,
         "seekdb_deps_commit": repo_sha,
-        "upstream": {
-            "repository": metadata["source"]["repository"],
-            "tag": metadata["source"]["tag"],
-            "revision": source_revision_sha,
-        },
+        "upstream": upstream_record(metadata, source_revision_sha),
         "patches": patches,
         "target": profile,
         "observed": context.observed_toolchain,
@@ -330,7 +434,6 @@ def main():
     date = release_date(args.date)
     package_root, metadata = package_paths(args.name, args.version)
     repo_sha, repo_checkout = repository_commit()
-    source_revision_sha, source_dir = source_revision(package_root, metadata, repo_checkout)
     output_dir = Path(args.output).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -347,15 +450,20 @@ def main():
     artifacts = []
     with tempfile.TemporaryDirectory(prefix=".seekdb-deps-", dir=str(output_dir)) as temporary:
         temporary = Path(temporary)
+        source_revision_sha, source_dir = source_revision(
+            package_root, metadata, repo_checkout, temporary / "upstream"
+        )
+        artifact_output = temporary / "artifacts"
+        artifact_output.mkdir()
         if args.kind in ("source", "both"):
             artifacts.append(source_artifact(
                 package_root, metadata, source_revision_sha, source_dir,
-                repo_sha, temporary, date,
+                repo_sha, artifact_output, date,
             ))
         if target:
             artifacts.append(binary_artifact(
                 package_root, metadata, source_revision_sha, source_dir,
-                repo_sha, temporary, date, target, args.jobs,
+                repo_sha, artifact_output, date, target, args.jobs,
             ))
         for artifact in artifacts:
             final_path = output_dir / artifact["path"].name
