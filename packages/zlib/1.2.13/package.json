@@ -28,10 +28,5 @@
       "include/zconf.h",
       "lib/zlibstatic.lib"
     ]
-  },
-  "references": {
-    "ob_deps_reference_commit": "5ce6f4b454421f5c4711d8ac454586dbb3402e15",
-    "ob_deps_build_recipe": "rpm/devdeps-zlib-static-build.sh",
-    "ob_deps_master_default_version": "1.3.1"
   }
 }
