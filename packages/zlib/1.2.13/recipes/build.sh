@@ -5,7 +5,7 @@ PACKAGE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 : "${SOURCE_DIR:=${PACKAGE_DIR}/source}"
 : "${BUILD_DIR:?BUILD_DIR must point to a temporary build directory}"
 : "${DESTDIR:?DESTDIR must point to the package staging directory}"
-: "${PREFIX:=/usr/local/oceanbase/deps/devel}"
+: "${PREFIX:?PREFIX must be set by the package metadata}"
 : "${JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)}"
 
 mkdir -p "${BUILD_DIR}" "${DESTDIR}"

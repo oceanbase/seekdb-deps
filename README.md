@@ -8,7 +8,7 @@ Use this repository for dependency sources, build configuration, and patches mai
 
 SeekDB should consume a pinned revision of this repository so dependency updates can be reviewed and reproduced.
 
-Package files live under `packages/<name>/<version>/`: upstream sources are kept in `source/`, maintained build recipes in `recipes/`, and package metadata in `package.yaml`. The builder creates build intermediates and staging files in temporary directories outside the checkout, then writes release archives to the ignored `dist/` directory unless `--output` is supplied.
+Package files live under `packages/<name>/<version>/`: upstream sources are kept in `source/`, maintained build recipes in `recipes/`, and package metadata in `package.yaml`. Binary packages use `/usr/local/seekdb/deps` as their installation prefix. The builder creates build intermediates and staging files in temporary directories outside the checkout, then writes release archives to the ignored `dist/` directory unless `--output` is supplied.
 
 ## Licensing
 
