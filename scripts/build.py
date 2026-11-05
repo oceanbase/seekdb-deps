@@ -258,9 +258,10 @@ class RecipeContext:
             command.extend(["--target"] + list(targets))
         self.run(command, cwd=self.build_dir)
         if install:
+            install_prefix = Path(os.path.relpath(self.stage_dir, self.build_dir)).as_posix()
             self.run([
                 "cmake", "--install", str(self.build_dir), "--config", "Release",
-                "--prefix", str(self.stage_dir),
+                "--prefix", install_prefix,
             ], cwd=self.build_dir)
 
     def install(self, source, relative_destination):
