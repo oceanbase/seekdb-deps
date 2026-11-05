@@ -17,7 +17,9 @@ git submodule update --init -- packages/zlib/1.2.13/source
 python3 scripts/package.py zlib 1.2.13 --target linux-x86_64-glibc232-gcc9
 ```
 
-The profile describes the local validation builder (x86_64, glibc 2.32, GCC 9.4.0); it is not yet a published SeekDB release target. Output goes to the ignored `dist/` directory unless `--output` is supplied.
+The package directory keeps upstream source in `source/`, maintained build recipes in `recipes/`, and package metadata in `package.yaml`. The builder creates build intermediates and staging files in temporary directories outside the checkout, then writes the source and binary archives to the ignored `dist/` directory unless `--output` is supplied. This keeps disposable build output away from the checked-in dependency code and recipes.
+
+The profile describes the local validation builder (x86_64, glibc 2.32, GCC 9.4.0); it is not yet a published SeekDB release target.
 
 ## Licensing
 

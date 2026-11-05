@@ -5,7 +5,7 @@ upstream_repository: https://github.com/madler/zlib.git
 upstream_tag: v1.2.13
 upstream_revision: 04f42ceca40f73e2978b50e93806c2a18c1281fc
 source_path: source
-build_script: build/build.sh
+build_script: recipes/build.sh
 install_prefix: /usr/local/oceanbase/deps/devel
 linkage: static
 patches: []
