@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "gtest",
+  "version": "1.14.0",
+  "source": {
+    "path": "source",
+    "url": "https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz",
+    "repository": "https://github.com/google/googletest.git",
+    "tag": "v1.14.0",
+    "revision": "f8d7d77c06936315286eb55f8de22cd23c188571",
+    "archive_sha256": "8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
+    "strip_prefix": "googletest-1.14.0"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "BSD-3-Clause",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/gtest/gtest.h",
+      "include/gmock/gmock.h",
+      "lib/libgtest.a",
+      "lib/libgtest_main.a",
+      "lib/libgmock.a",
+      "lib/libgmock_main.a"
+    ],
+    "windows": [
+      "include/gtest/gtest.h",
+      "include/gmock/gmock.h",
+      "lib/gtest.lib",
+      "lib/gtest_main.lib",
+      "lib/gmock.lib",
+      "lib/gmock_main.lib"
+    ]
+  }
+}
