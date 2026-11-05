@@ -60,7 +60,7 @@ The initial profiles cover these build configurations:
 
 Profiles describe target ABI and supported build hosts, not the compiler used to produce a package. The shared initializer honors `CC` and `CXX` when supplied and otherwise selects host defaults; Linux compilers must be version 9.4.0 or newer, and the Windows C++ toolset must be 14.30 or newer. Linux builds use a glibc 2.32-or-older host so the resulting package stays within its declared ABI baseline. The initializer loads the Visual Studio developer environment when needed. For Android, set `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`; the NDK must be 27.2.12479018 or newer, while the profile records only ABI and API level. macOS builds require the Xcode command line tools. The actual compiler and SDK versions are recorded in the package manifest for provenance.
 
-Profiles are build contracts, not validation claims. The zlib 1.2.13 recipe currently builds only upstream's `zlibstatic` target and stages the static library and public headers. The Linux profile has been built on Linux x86_64 with glibc 2.32 and GCC 9.4.0. macOS, Windows, and Android profiles are configured but have not been built in this change.
+Profiles are build contracts, not validation claims. The zlib 1.2.13 recipe currently builds only upstream's `zlibstatic` target and stages the static library and public headers. The Linux zlib binary was built in the previous sample revision on Linux x86_64 with glibc 2.32 and GCC 9.4.0; the current environment-initialization and profile refactor has not been built. macOS, Windows, and Android profiles also remain unbuilt.
 
 ## Licensing
 
