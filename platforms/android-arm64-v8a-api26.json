@@ -1,5 +1,5 @@
 {
-  "id": "android-arm64-v8a-api26-ndk27",
+  "id": "android-arm64-v8a-api26",
   "family": "android",
   "architecture": "arm64-v8a",
   "hosts": [
@@ -16,9 +16,7 @@
       "architectures": ["x86_64"]
     }
   ],
-  "toolchain": {
-    "kind": "android-ndk",
-    "ndk_revision": "27.2.12479018",
+  "abi": {
     "api_level": 26
   }
 }

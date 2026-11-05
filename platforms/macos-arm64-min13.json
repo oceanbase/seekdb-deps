@@ -8,9 +8,7 @@
       "architectures": ["arm64"]
     }
   ],
-  "toolchain": {
-    "kind": "apple",
-    "compiler": "clang",
-    "deployment_target": "13.0"
+  "abi": {
+    "minimum_os_version": "13.0"
   }
 }

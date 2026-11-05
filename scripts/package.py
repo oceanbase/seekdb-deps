@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from archive import create_archive, sha256_file, verify_manifest, write_manifest
 from build import RecipeContext, load_target
+from init_build_env import initialize_build_environment
 
 
 def run(argv, *, cwd=None, capture=False):
@@ -341,8 +342,7 @@ def required_artifacts(metadata, target_family):
     return [safe_relative(path, "required artifact").as_posix() for path in selected]
 
 
-def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
-                    repo_sha, output_dir, release_date, target_id, jobs):
+def target_profile(target_id):
     if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", target_id):
         raise ValueError("Invalid target profile id: " + target_id)
     profile_path = ROOT / "platforms" / (target_id + ".json")
@@ -351,6 +351,12 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
     profile = load_target(profile_path)
     if profile["id"] != target_id:
         raise ValueError("Target profile path and id do not match")
+    return profile
+
+
+def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
+                    repo_sha, output_dir, release_date, target_id, profile,
+                    build_environment, jobs):
     output = output_dir / "{}-{}-bin-{}-{}-{}.tar.gz".format(
         metadata["name"], metadata["version"], target_id, release_date, repo_sha[:12]
     )
@@ -364,6 +370,7 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
         build_dir=build_dir / "cmake",
         stage_dir=package_root_in_archive,
         profile=profile,
+        build_environment=build_environment,
         jobs=jobs,
     )
     context.build_dir.mkdir(parents=True)
@@ -397,7 +404,7 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
         "upstream": upstream_record(metadata, source_revision_sha),
         "patches": patches,
         "target": profile,
-        "observed": context.observed_toolchain,
+        "build_environment": context.observed_build_environment,
         "recipe": metadata["recipe"],
         "license": {
             "spdx_id": metadata["license"]["spdx_id"],
@@ -433,11 +440,13 @@ def main():
         raise ValueError("--jobs must be positive")
     date = release_date(args.date)
     package_root, metadata = package_paths(args.name, args.version)
+    target = args.target if args.kind in ("binary", "both") else None
+    profile = target_profile(target) if target else None
+    build_environment = initialize_build_environment(profile) if profile else None
     repo_sha, repo_checkout = repository_commit()
     output_dir = Path(args.output).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    target = args.target if args.kind in ("binary", "both") else None
     expected_names = []
     if args.kind in ("source", "both"):
         expected_names.append("{}-{}-src-{}-{}.tar.gz".format(args.name, args.version, date, repo_sha[:12]))
@@ -463,7 +472,8 @@ def main():
         if target:
             artifacts.append(binary_artifact(
                 package_root, metadata, source_revision_sha, source_dir,
-                repo_sha, artifact_output, date, target, args.jobs,
+                repo_sha, artifact_output, date, target, profile,
+                build_environment, args.jobs,
             ))
         for artifact in artifacts:
             final_path = output_dir / artifact["path"].name
