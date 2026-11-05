@@ -56,47 +56,14 @@ jobs:
       repo_sha_short: ${{ steps.inputs.outputs.repo_sha_short }}
       targets: ${{ steps.inputs.outputs.targets }}
     steps:
+      - uses: actions/checkout@v7
+
       - id: inputs
         env:
           REQUESTED_TARGET: ${{ inputs.target }}
           REQUESTED_DATE: ${{ inputs.date }}
           REPOSITORY_SHA: ${{ github.sha }}
-        run: |
-          python3 - <<'PY'
-          from datetime import datetime, timezone
-          import json
-          import os
-          import re
-
-          targets = [
-              {"id": "linux-x86_64-glibc217", "family": "linux", "runner": "ubuntu-24.04",
-               "container_image": "quay.io/pypa/manylinux2014_x86_64:latest"},
-              {"id": "linux-aarch64-glibc217", "family": "linux", "runner": "ubuntu-24.04-arm",
-               "container_image": "quay.io/pypa/manylinux2014_aarch64:latest"},
-              {"id": "macos-arm64-min13", "family": "macos", "runner": "macos-15"},
-              {"id": "windows-x86_64-md", "family": "windows", "runner": "windows-2025"},
-              {"id": "android-arm64-v8a-api26", "family": "android", "runner": "ubuntu-24.04"},
-          ]
-          requested_target = os.environ["REQUESTED_TARGET"]
-          if requested_target != "all":
-              targets = [target for target in targets if target["id"] == requested_target]
-              if not targets:
-                  raise SystemExit("Unsupported target: " + requested_target)
-
-          requested_date = os.environ["REQUESTED_DATE"].strip()
-          if requested_date:
-              if not re.fullmatch(r"\d{8}", requested_date):
-                  raise SystemExit("Date must use YYYYMMDD")
-              datetime.strptime(requested_date, "%Y%m%d")
-              release_date = requested_date
-          else:
-              release_date = datetime.now(timezone.utc).strftime("%Y%m%d")
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              print("release_date=" + release_date, file=output)
-              print("repo_sha_short=" + os.environ["REPOSITORY_SHA"][:12], file=output)
-              print("targets=" + json.dumps(targets, separators=(",", ":")), file=output)
-          PY
+        run: python3 .github/scripts/prepare_package_matrix.py
 
   source:
     if: ${{ inputs.kind == 'source' || inputs.kind == 'both' }}
