@@ -5,7 +5,7 @@ def build(ctx):
     ctx.cmake(targets=("zlibstatic",))
 
     if ctx.target.family == "windows":
-        library = ctx.build_dir / "zlibstatic.lib"
+        library = ctx.build_dir / "libzs.lib"
     else:
         library = ctx.build_dir / "libz.a"
 
