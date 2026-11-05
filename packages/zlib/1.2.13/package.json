@@ -27,14 +27,8 @@
     ]
   },
   "references": {
-    "seekdb_linux_package": "devdeps-zlib-static-1.2.13",
-    "seekdb_reference_commit": "16cd4f958f5ca52e160d54fd5abe125f9c1edbc4",
     "ob_deps_reference_commit": "5ce6f4b454421f5c4711d8ac454586dbb3402e15",
     "ob_deps_build_recipe": "rpm/devdeps-zlib-static-build.sh",
-    "ob_deps_master_default_version": "1.3.1",
-    "seekdb_consumers": [
-      "src/oblib/lib/compress/zlib/ob_zlib_compressor.h",
-      "src/sql/engine/expr/ob_expr_compress.cpp"
-    ]
+    "ob_deps_master_default_version": "1.3.1"
   }
 }
