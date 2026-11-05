@@ -1,5 +1,5 @@
 {
-  "id": "linux-x86_64-glibc232",
+  "id": "linux-x86_64-glibc217",
   "family": "linux",
   "architecture": "x86_64",
   "cflags": ["-O2", "-fPIC", "-march=x86-64"],
@@ -11,6 +11,6 @@
   ],
   "abi": {
     "libc": "glibc",
-    "minimum_libc_version": "2.32"
+    "minimum_libc_version": "2.17"
   }
 }
