@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -88,6 +89,19 @@ def _profile_flags(profile, name):
     if not isinstance(flags, list) or any(not isinstance(flag, str) for flag in flags):
         raise ValueError("Target profile field '{}' must be a list of strings".format(name))
     return " ".join(flag.strip() for flag in flags if flag.strip())
+
+
+def _cxx_target_macros(compiler, flags, env):
+    result = subprocess.run(
+        [compiler, *shlex.split(flags), "-dM", "-E", "-x", "c++", "-"],
+        input="#include <features.h>\n#include <bits/c++config.h>\n",
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
+    return dict(re.findall(r"^#define (\w+) (.+)$", result.stdout, re.MULTILINE))
 
 
 def _windows_developer_environment(env):
@@ -216,19 +230,6 @@ def initialize_build_environment(profile):
     family = profile["family"]
 
     if family == "linux":
-        libc, libc_version = platform.libc_ver()
-        expected_libc = abi["libc"]
-        minimum_libc_version = _version_tuple(abi["minimum_libc_version"])
-        found_libc_version = _version_tuple(libc_version) if libc_version else ()
-        if libc != expected_libc or not found_libc_version or not _version_at_least(
-            minimum_libc_version, found_libc_version
-        ):
-            raise ValueError(
-                "Target {} needs a {} {} or older build environment; found {} {}".format(
-                    profile["id"], expected_libc, abi["minimum_libc_version"],
-                    libc or "unknown", libc_version or "unknown",
-                )
-            )
         env.setdefault("CC", "cc")
         env.setdefault("CXX", "c++")
         if len(env["CC"].split()) != 1 or len(env["CXX"].split()) != 1:
@@ -244,6 +245,30 @@ def initialize_build_environment(profile):
             )
         cflags = _join_flags(_profile_flags(profile, "cflags"), env.get("CFLAGS", ""))
         cxxflags = _join_flags(abi.get("cxxflags", ""), env.get("CXXFLAGS", ""))
+        sysroot = _run([cxx_compiler["path"], "-print-sysroot"], env=env, capture=True).strip()
+        macros = _cxx_target_macros(cxx_compiler["path"], cxxflags, env)
+        libc_version = "{}.{}".format(macros.get("__GLIBC__", ""), macros.get("__GLIBC_MINOR__", ""))
+        host_libc, host_libc_version = platform.libc_ver()
+        found_libc_version = _version_tuple(libc_version) if re.fullmatch(r"\d+\.\d+", libc_version) else ()
+        minimum_libc_version = _version_tuple(abi["minimum_libc_version"])
+        if (abi["libc"] != "glibc" or not found_libc_version
+                or not _version_at_least(minimum_libc_version, found_libc_version)
+                or (not sysroot and (host_libc != "glibc" or not host_libc_version
+                                    or not _version_at_least(minimum_libc_version,
+                                                             _version_tuple(host_libc_version))))):
+            raise ValueError(
+                "Target {} needs glibc {} or older headers and runtime; compiler uses {}, "
+                "host uses {} {}".format(profile["id"], abi["minimum_libc_version"],
+                                          libc_version, host_libc or "unknown",
+                                          host_libc_version or "unknown")
+            )
+        cxx11_abi = macros.get("_GLIBCXX_USE_CXX11_ABI")
+        if cxx11_abi != "1":
+            raise ValueError(
+                "Linux packages require _GLIBCXX_USE_CXX11_ABI=1; compiler uses {}".format(
+                    cxx11_abi or "unknown"
+                )
+            )
         args.extend([
             "-DCMAKE_C_COMPILER={}".format(c_compiler["path"]),
             "-DCMAKE_CXX_COMPILER={}".format(cxx_compiler["path"]),
@@ -253,7 +278,8 @@ def initialize_build_environment(profile):
         if cxxflags:
             args.append("-DCMAKE_CXX_FLAGS=" + cxxflags)
         observed.update({"c_compiler": c_compiler, "cxx_compiler": cxx_compiler,
-                         "libc": libc, "libc_version": libc_version,
+                         "libc": abi["libc"], "libc_version": libc_version,
+                         "sysroot": sysroot,
                          "cflags": cflags, "cxxflags": cxxflags,
                          "ldflags": env.get("LDFLAGS", "")})
     elif family == "macos":
