@@ -263,10 +263,10 @@ def initialize_build_environment(profile):
                                           host_libc_version or "unknown")
             )
         cxx11_abi = macros.get("_GLIBCXX_USE_CXX11_ABI")
-        if cxx11_abi != str(abi["cxx11_abi"]):
+        if cxx11_abi != "1":
             raise ValueError(
-                "Target {} needs _GLIBCXX_USE_CXX11_ABI={}; compiler uses {}".format(
-                    profile["id"], abi["cxx11_abi"], cxx11_abi or "unknown"
+                "Linux packages require _GLIBCXX_USE_CXX11_ABI=1; compiler uses {}".format(
+                    cxx11_abi or "unknown"
                 )
             )
         args.extend([
@@ -279,7 +279,7 @@ def initialize_build_environment(profile):
             args.append("-DCMAKE_CXX_FLAGS=" + cxxflags)
         observed.update({"c_compiler": c_compiler, "cxx_compiler": cxx_compiler,
                          "libc": abi["libc"], "libc_version": libc_version,
-                         "sysroot": sysroot, "cxx11_abi": int(cxx11_abi),
+                         "sysroot": sysroot,
                          "cflags": cflags, "cxxflags": cxxflags,
                          "ldflags": env.get("LDFLAGS", "")})
     elif family == "macos":
