@@ -4,6 +4,7 @@
 def build(ctx):
     options = {
         "BUILD_GMOCK": True,
+        "CMAKE_INSTALL_LIBDIR": "lib",
         "INSTALL_GTEST": True,
     }
     if ctx.target.family == "windows":
