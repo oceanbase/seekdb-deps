@@ -13,7 +13,9 @@ import tempfile
 
 MINIMUM_CMAKE_VERSION = (3, 22, 1)
 MINIMUM_LINUX_COMPILER_VERSION = (9, 4, 0)
-MINIMUM_WINDOWS_TOOLSET_VERSION = (14, 30)
+MINIMUM_WINDOWS_TOOLSET_VERSION = (14, 29)
+DEFAULT_WINDOWS_TOOLSET_VERSION = "14.29"
+DEFAULT_WINDOWS_SDK_VERSION = "10.0.19041.0"
 MINIMUM_ANDROID_NDK_REVISION = (27, 2, 12479018)
 
 
@@ -113,22 +115,23 @@ def _windows_developer_environment(env):
     if not vswhere.is_file():
         raise ValueError("Visual Studio C++ tools were not found; install the x64 C++ build tools")
     installation = _run([
-        str(vswhere), "-latest", "-products", "*", "-requires",
+        str(vswhere), "-latest", "-version", "[16.0,18.0)", "-products", "*", "-requires",
         "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath",
     ], env=env, capture=True).strip()
     if not installation:
         raise ValueError("Visual Studio installation with x64 C++ tools was not found")
-    developer_command = Path(installation) / "Common7" / "Tools" / "VsDevCmd.bat"
+    developer_command = Path(installation) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
     if not developer_command.is_file():
-        raise ValueError("Visual Studio developer command was not found: " + str(developer_command))
+        raise ValueError("Visual Studio compiler environment was not found: " + str(developer_command))
 
     command_environment = dict(env)
-    command_environment["SEEKDB_INTERNAL_VSDEVCMD"] = str(developer_command)
-    with tempfile.TemporaryDirectory(prefix="seekdb-vsdevcmd-") as temporary_directory:
+    command_environment["SEEKDB_INTERNAL_VCVARSALL"] = str(developer_command)
+    with tempfile.TemporaryDirectory(prefix="seekdb-vcvarsall-") as temporary_directory:
         command_script = Path(temporary_directory) / "initialize.cmd"
         command_script.write_text(
             "@echo off\r\n"
-            'call "%SEEKDB_INTERNAL_VSDEVCMD%" -arch=x64 -host_arch=x64 >nul\r\n'
+            f'call "%SEEKDB_INTERNAL_VCVARSALL%" amd64 {DEFAULT_WINDOWS_SDK_VERSION} '
+            f'-vcvars_ver={DEFAULT_WINDOWS_TOOLSET_VERSION} >nul\r\n'
             "if errorlevel 1 exit /b %errorlevel%\r\n"
             "set\r\n",
             encoding="ascii",
@@ -151,9 +154,13 @@ def _windows_developer_environment(env):
             continue
         key, value = line.split("=", 1)
         initialized[key] = value
-    initialized.pop("SEEKDB_INTERNAL_VSDEVCMD", None)
+    initialized.pop("SEEKDB_INTERNAL_VCVARSALL", None)
     if not initialized.get("VSCMD_VER"):
         raise ValueError("Visual Studio developer environment initialization failed")
+    if not initialized.get("VCToolsVersion", "").startswith(DEFAULT_WINDOWS_TOOLSET_VERSION + "."):
+        raise ValueError("Visual Studio did not select C++ tools " + DEFAULT_WINDOWS_TOOLSET_VERSION)
+    if initialized.get("WindowsSDKVersion", "").rstrip("\\") != DEFAULT_WINDOWS_SDK_VERSION:
+        raise ValueError("Visual Studio did not select Windows SDK " + DEFAULT_WINDOWS_SDK_VERSION)
     return initialized
 
 
@@ -312,7 +319,7 @@ def initialize_build_environment(profile):
         version = _version_tuple(toolset) if toolset else ()
         if not version or not _version_at_least(version, MINIMUM_WINDOWS_TOOLSET_VERSION):
             raise ValueError(
-                "Visual Studio C++ tools 14.30 or newer are required; found " + (toolset or "unknown")
+                "Visual Studio C++ tools 14.29 or newer are required; found " + (toolset or "unknown")
             )
         env.setdefault("CC", "cl")
         env.setdefault("CXX", "cl")
@@ -325,7 +332,9 @@ def initialize_build_environment(profile):
             "-DCMAKE_MSVC_RUNTIME_LIBRARY={}".format(abi["runtime_library"]),
         ])
         observed.update({"c_compiler": c_compiler, "cxx_compiler": cxx_compiler,
-                         "toolset_version": toolset, "runtime": abi["runtime"],
+                         "toolset_version": toolset,
+                         "sdk_version": env.get("WindowsSDKVersion", "").rstrip("\\"),
+                         "runtime": abi["runtime"],
                          "configuration": "Release"})
     elif family == "android":
         for variable in ("CC", "CXX", "CFLAGS", "CXXFLAGS", "LDFLAGS"):
