@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import shutil
+import subprocess
 
 
 PREFIX = Path("usr/local/oceanbase/devtools")
@@ -34,6 +35,7 @@ def build(ctx):
         "LLVM_ENABLE_PROJECTS": "clang;lld",
         "LLVM_BUILD_LLVM_DYLIB": "ON",
         "LLVM_LINK_LLVM_DYLIB": "ON",
+        "CLANG_LINK_CLANG_DYLIB": "OFF",
         "LLVM_ENABLE_RTTI": "ON",
         "LLVM_ENABLE_EH": "ON",
         "LLVM_ENABLE_DUMP": "ON",
@@ -80,8 +82,20 @@ def build(ctx):
             destination.symlink_to(source.readlink())
         elif source.is_file():
             shutil.copy2(source, destination)
-    if not any(target_library.iterdir()):
-        raise ValueError("LLVM shared library is missing")
+    if not (target_library / "libLLVM-17.so").exists():
+        raise ValueError("Required LLVM shared library is missing: libLLVM-17.so")
+
+    strip_tool = subprocess.check_output(
+        [ctx.environment["CC"], "-print-prog-name=strip"],
+        env=ctx.environment, text=True,
+    ).strip()
+    for binary in (target_bin / name for name in TOOLS):
+        ctx.run([strip_tool, "--strip-unneeded", str(binary)])
+        ctx.run(["patchelf", "--set-rpath", "$ORIGIN/../lib", str(binary)])
+    for library in target_library.iterdir():
+        if library.is_file() and not library.is_symlink():
+            ctx.run([strip_tool, "--strip-unneeded", str(library)])
+            ctx.run(["patchelf", "--set-rpath", "$ORIGIN", str(library)])
 
     resource_headers = built_library / "clang" / "17" / "include"
     if not (resource_headers / "stddef.h").is_file():

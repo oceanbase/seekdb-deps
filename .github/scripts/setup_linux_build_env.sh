@@ -14,7 +14,7 @@ tar -xj -f "$archive" -C "$binary_dir" --strip-components=1 bin/micromamba
 export MAMBA_ROOT_PREFIX="$RUNNER_TEMP/micromamba-root"
 "$binary_dir/micromamba" create --yes --prefix "$environment_dir" \
   --channel conda-forge --strict-channel-priority \
-  python=3.11 cmake ninja \
+  python=3.11 cmake ninja patchelf \
   "gcc_linux-${CONDA_ARCH}=12" \
   "gxx_linux-${CONDA_ARCH}=12" \
   "sysroot_linux-${CONDA_ARCH}=2.17"

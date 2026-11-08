@@ -36,6 +36,7 @@
       "usr/local/oceanbase/devtools/bin/llvm-objdump",
       "usr/local/oceanbase/devtools/bin/llvm-ranlib",
       "usr/local/oceanbase/devtools/bin/llvm-strip",
+      "usr/local/oceanbase/devtools/lib/libLLVM-17.so",
       "usr/local/oceanbase/devtools/lib/clang/17/include/stddef.h"
     ]
   }
