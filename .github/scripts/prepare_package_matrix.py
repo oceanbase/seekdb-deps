@@ -14,6 +14,7 @@ TARGETS = [
         "family": "linux",
         "runner": "ubuntu-24.04",
         "conda_arch": "64",
+        "micromamba_sha256": "3dbcca4c4b3e64e2b0c7ca7121307e687b6c10ce7fe889f21d5c10d817f983a9",
         "compiler_prefix": "x86_64-conda-linux-gnu",
     },
     {
@@ -21,6 +22,7 @@ TARGETS = [
         "family": "linux",
         "runner": "ubuntu-24.04-arm",
         "conda_arch": "aarch64",
+        "micromamba_sha256": "9dd1e427bb173730d57a025a7536b3e036af8890b28f524b53f7a4b53e373ced",
         "compiler_prefix": "aarch64-conda-linux-gnu",
     },
     {"id": "macos-arm64-min13", "family": "macos", "runner": "macos-15"},
