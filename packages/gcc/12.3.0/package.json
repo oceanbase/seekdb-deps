@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "name": "gcc",
+  "version": "12.3.0",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://mirrors.kernel.org/gnu/gcc/gcc-12.3.0/gcc-12.3.0.tar.xz",
+    "repository": "https://github.com/gcc-mirror/gcc.git",
+    "tag": "releases/gcc-12.3.0",
+    "revision": "8fc1a49c9312b05d925b7d21f1d2145d70818151",
+    "archive_sha256": "949a5d4f99e786421a93b532b22ffab5578de7321369975b91aec97adfda8c3b",
+    "strip_prefix": "gcc-12.3.0",
+    "extra_archives": [
+      {
+        "path": "gmp",
+        "url": "https://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.2.1.tar.bz2",
+        "archive_sha256": "eae9326beb4158c386e39a356818031bd28f3124cf915f8c5b1dc4c7a36b4d7c",
+        "strip_prefix": "gmp-6.2.1"
+      },
+      {
+        "path": "mpfr",
+        "url": "https://gcc.gnu.org/pub/gcc/infrastructure/mpfr-4.1.0.tar.bz2",
+        "archive_sha256": "feced2d430dd5a97805fa289fed3fc8ff2b094c02d05287fd6133e7f1f0ec926",
+        "strip_prefix": "mpfr-4.1.0"
+      },
+      {
+        "path": "mpc",
+        "url": "https://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.2.1.tar.gz",
+        "archive_sha256": "17503d2c395dfcf106b622dc142683c1199431d095367c6aacba6eec30340459",
+        "strip_prefix": "mpc-1.2.1"
+      },
+      {
+        "path": "isl",
+        "url": "https://gcc.gnu.org/pub/gcc/infrastructure/isl-0.24.tar.bz2",
+        "archive_sha256": "fcf78dd9656c10eb8cf9fbd5f59a0b6b01386205fe1934b3b287a0a1898145c0",
+        "strip_prefix": "isl-0.24"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "GPL-3.0-or-later WITH GCC-exception-3.1",
+    "source_path": "COPYING3"
+  },
+  "required_artifacts": {
+    "default": [
+      "usr/local/oceanbase/devtools/include/c++/12/vector",
+      "usr/local/oceanbase/devtools/lib64/libstdc++.a",
+      "usr/local/oceanbase/devtools/lib64/libstdc++.so.6.0.30",
+      "usr/local/oceanbase/devtools/lib64/libgcc_s.so.1",
+      "usr/local/oceanbase/devtools/lib64/libatomic.a"
+    ]
+  }
+}
