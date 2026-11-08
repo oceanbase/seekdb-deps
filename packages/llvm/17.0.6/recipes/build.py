@@ -43,6 +43,7 @@ def build(ctx):
         "LLVM_INCLUDE_DOCS": "OFF",
         "LLVM_ENABLE_BINDINGS": "OFF",
         "LLVM_ENABLE_TERMINFO": "OFF",
+        "LLVM_ENABLE_LIBEDIT": "OFF",
         "LLVM_ENABLE_LIBXML2": "OFF",
         "LLVM_ENABLE_ZSTD": "OFF",
         "LLVM_ENABLE_ZLIB": "OFF",
