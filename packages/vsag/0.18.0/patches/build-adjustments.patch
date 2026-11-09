@@ -153,10 +153,21 @@ index a8f90103..c1693a41 100644
  add_dependencies (vsag version)
 +add_dependencies (vsag_static version)
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
-index 95e07446..f5f7feae 100644
+index 95e07446..29408e14 100644
 --- a/extern/antlr4/antlr4.cmake
 +++ b/extern/antlr4/antlr4.cmake
-@@ -48,7 +48,7 @@ include_directories(extern/antlr4/fc)
+@@ -11,6 +11,10 @@ else ()
+ endif ()
+ 
+ set (FULL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VSAG_ANTLR4_CXX11_ABI}")
++if (MSVC)
++    # ANTLR4 4.13.2 uses std::chrono without including its header on MSVC.
++    set (FULL_CXX_FLAGS "${FULL_CXX_FLAGS} /FIchrono")
++endif ()
+ 
+ ExternalProject_Add(
+         ${name}
+@@ -48,7 +52,7 @@ include_directories(extern/antlr4/fc)
  file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
  add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
  add_dependencies(antlr4-autogen antlr4)
