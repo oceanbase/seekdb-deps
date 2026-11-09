@@ -60,6 +60,9 @@ jobs:
 
       - id: inputs
         env:
+          PACKAGE_NAME: ${{ inputs.package }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+          REQUESTED_KIND: ${{ inputs.kind }}
           REQUESTED_TARGET: ${{ inputs.target }}
           REQUESTED_DATE: ${{ inputs.date }}
           REPOSITORY_SHA: ${{ github.sha }}
@@ -128,7 +131,12 @@ jobs:
             python=3.11 cmake ninja
             gcc_linux-${{ matrix.target.conda_arch }}=12
             gxx_linux-${{ matrix.target.conda_arch }}=12
+            ${{ inputs.package == 'vsag' && format('gfortran_linux-{0}=12', matrix.target.conda_arch) || '' }}
             sysroot_linux-${{ matrix.target.conda_arch }}=2.17
+
+      - name: Install VSAG build headers
+        if: ${{ matrix.target.family == 'linux' && inputs.package == 'vsag' }}
+        run: sudo apt-get update && sudo apt-get install -y libaio-dev
 
       - uses: actions/setup-java@v6
         if: ${{ matrix.target.family == 'android' }}

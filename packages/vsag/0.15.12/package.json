@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "name": "vsag",
+  "version": "0.15.12",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.15.12",
+    "repository": "https://github.com/antgroup/vsag.git",
+    "tag": "v0.15.12",
+    "revision": "11cf077efaf12918cad6e3d47d54251f35704249",
+    "archive_sha256": "07ec78b663462f3fd24f1ccc3f352b719277cf27a4653aeee236058e88f23f26",
+    "strip_prefix": "vsag-0.15.12",
+    "extra_archives": [
+      {
+        "path": "vendor_antlr4",
+        "url": "https://codeload.github.com/antlr/antlr4/tar.gz/refs/tags/4.13.2",
+        "archive_sha256": "9f18272a9b32b622835a3365f850dd1063d60f5045fb1e12ce475ae6e18a35bb",
+        "strip_prefix": "antlr4-4.13.2"
+      },
+      {
+        "path": "vendor_boost",
+        "url": "https://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz/download",
+        "archive_sha256": "8aa4e330c870ef50a896634c931adf468b21f8a69b77007e45c444151229f665",
+        "strip_prefix": "boost_1_67_0"
+      },
+      {
+        "path": "vendor_openblas",
+        "url": "https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23",
+        "archive_sha256": "5d9491d07168a5d00116cdc068a40022c3455bf9293c7cb86a65b1054d7e5114",
+        "strip_prefix": "OpenBLAS-0.3.23"
+      },
+      {
+        "path": "vendor_spdlog",
+        "url": "https://codeload.github.com/gabime/spdlog/tar.gz/refs/tags/v1.12.0",
+        "archive_sha256": "4dccf2d10f410c1e2feaff89966bfc49a1abb29ef6f08246335b110e001e09a9",
+        "strip_prefix": "spdlog-1.12.0"
+      },
+      {
+        "path": "vendor_json",
+        "url": "https://codeload.github.com/nlohmann/json/tar.gz/refs/tags/v3.11.3",
+        "archive_sha256": "0d8ef5af7f9794e3263480193c491549b2ba6cc74bb018906202ada498a79406",
+        "strip_prefix": "json-3.11.3"
+      },
+      {
+        "path": "vendor_cpuinfo",
+        "url": "https://codeload.github.com/pytorch/cpuinfo/tar.gz/ca678952a9a8eaa6de112d154e8e104b22f9ab3f",
+        "archive_sha256": "c8f43b307fa7d911d88fec05448161eb1949c3fc0cb62f3a7a2c61928cdf2e9b",
+        "strip_prefix": "cpuinfo-ca678952a9a8eaa6de112d154e8e104b22f9ab3f"
+      },
+      {
+        "path": "vendor_fmt",
+        "url": "https://codeload.github.com/fmtlib/fmt/tar.gz/refs/tags/10.2.1",
+        "archive_sha256": "1250e4cc58bf06ee631567523f48848dc4596133e163f02615c97f78bab6c811",
+        "strip_prefix": "fmt-10.2.1"
+      },
+      {
+        "path": "vendor_thread_pool",
+        "url": "https://codeload.github.com/log4cplus/ThreadPool/tar.gz/3507796e172d36555b47d6191f170823d9f6b12c",
+        "archive_sha256": "5919b8c88af6d22994c816c59e222dff9ef488995388727507407219f6654788",
+        "strip_prefix": "ThreadPool-3507796e172d36555b47d6191f170823d9f6b12c"
+      },
+      {
+        "path": "vendor_tsl",
+        "url": "https://codeload.github.com/Tessil/robin-map/tar.gz/refs/tags/v1.4.0",
+        "archive_sha256": "7930dbf9634acfc02686d87f615c0f4f33135948130b8922331c16d90a03250c",
+        "strip_prefix": "robin-map-1.4.0"
+      },
+      {
+        "path": "vendor_roaringbitmap",
+        "url": "https://codeload.github.com/RoaringBitmap/CRoaring/tar.gz/refs/tags/v3.0.1",
+        "archive_sha256": "a1cac9489b1c806c5594073e5db36475e247604282a47b650f4166c185ab061f",
+        "strip_prefix": "CRoaring-3.0.1"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [
+    "patches/offline-sources.patch"
+  ],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "linux": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libgfortran_static.a",
+      "lib/libgomp_static.a"
+    ]
+  }
+}

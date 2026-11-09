@@ -29,11 +29,15 @@ TARGETS = [
 ]
 
 
-def selected_targets(requested_target):
+def selected_targets(requested_target, supported_targets):
+    known = {target["id"] for target in TARGETS}
+    if not supported_targets or any(target not in known for target in supported_targets):
+        raise SystemExit("Package declares no usable build targets")
     if requested_target == "all":
-        return TARGETS
+        return [target for target in TARGETS if target["id"] in supported_targets]
 
-    selected = [target for target in TARGETS if target["id"] == requested_target]
+    selected = [target for target in TARGETS
+                if target["id"] == requested_target and target["id"] in supported_targets]
     if not selected:
         raise SystemExit("Unsupported target: " + requested_target)
     return selected
@@ -53,7 +57,13 @@ def release_date(requested_date):
 
 
 def main():
-    targets = selected_targets(os.environ["REQUESTED_TARGET"])
+    package = os.environ["PACKAGE_NAME"]
+    version = os.environ["PACKAGE_VERSION"]
+    metadata_path = Path("packages") / package / version / "package.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    supported_targets = metadata.get("supported_targets", [target["id"] for target in TARGETS])
+    requested_target = "all" if os.environ["REQUESTED_KIND"] == "source" else os.environ["REQUESTED_TARGET"]
+    targets = selected_targets(requested_target, supported_targets)
     date = release_date(os.environ["REQUESTED_DATE"])
     repository_sha = os.environ["REPOSITORY_SHA"]
     output_path = Path(os.environ["GITHUB_OUTPUT"])
