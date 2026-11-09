@@ -78,17 +78,17 @@ def add_build_dependencies(targets, metadata):
     return selected
 
 
-def release_date(requested_date):
-    requested_date = requested_date.strip()
-    if not requested_date:
-        return datetime.now(timezone.utc).strftime("%Y%m%d")
-    if not re.fullmatch(r"\d{8}", requested_date):
-        raise SystemExit("Date must use YYYYMMDD")
+def release_timestamp(requested_timestamp):
+    requested_timestamp = requested_timestamp.strip()
+    if not requested_timestamp:
+        return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%z")
+    if not re.fullmatch(r"\d{8}T\d{6}\+0000", requested_timestamp):
+        raise SystemExit("Timestamp must use YYYYMMDDTHHMMSS+0000 (UTC)")
     try:
-        datetime.strptime(requested_date, "%Y%m%d")
+        datetime.strptime(requested_timestamp, "%Y%m%dT%H%M%S%z")
     except ValueError as error:
-        raise SystemExit("Invalid date: " + str(error))
-    return requested_date
+        raise SystemExit("Invalid timestamp: " + str(error))
+    return requested_timestamp
 
 
 def main():
@@ -99,12 +99,12 @@ def main():
     supported_targets = metadata.get("supported_targets", [target["id"] for target in TARGETS])
     requested_target = "all" if os.environ["REQUESTED_KIND"] == "source" else os.environ["REQUESTED_TARGET"]
     targets = add_build_dependencies(selected_targets(requested_target, supported_targets), metadata)
-    date = release_date(os.environ["REQUESTED_DATE"])
+    timestamp = release_timestamp(os.environ["REQUESTED_TIMESTAMP"])
     repository_sha = os.environ["REPOSITORY_SHA"]
     output_path = Path(os.environ["GITHUB_OUTPUT"])
 
     with output_path.open("a", encoding="utf-8") as output:
-        print("release_date=" + date, file=output)
+        print("release_timestamp=" + timestamp, file=output)
         print("repo_sha_short=" + repository_sha[:12], file=output)
         print("targets=" + json.dumps(targets, separators=(",", ":")), file=output)
 

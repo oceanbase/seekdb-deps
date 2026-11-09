@@ -34,8 +34,8 @@ on:
           - macos-arm64-min13
           - windows-x86_64-md
           - android-arm64-v8a-api26
-      date:
-        description: Artifact date in YYYYMMDD format. Empty uses the current UTC date.
+      timestamp:
+        description: Artifact timestamp in YYYYMMDDTHHMMSS+0000 format. Empty uses the current UTC time.
         type: string
         required: false
         default: ''
@@ -52,7 +52,7 @@ jobs:
   prepare:
     runs-on: ubuntu-24.04
     outputs:
-      release_date: ${{ steps.inputs.outputs.release_date }}
+      release_timestamp: ${{ steps.inputs.outputs.release_timestamp }}
       repo_sha_short: ${{ steps.inputs.outputs.repo_sha_short }}
       targets: ${{ steps.inputs.outputs.targets }}
     steps:
@@ -64,7 +64,7 @@ jobs:
           PACKAGE_VERSION: ${{ inputs.version }}
           REQUESTED_KIND: ${{ inputs.kind }}
           REQUESTED_TARGET: ${{ inputs.target }}
-          REQUESTED_DATE: ${{ inputs.date }}
+          REQUESTED_TIMESTAMP: ${{ inputs.timestamp }}
           REPOSITORY_SHA: ${{ github.sha }}
         run: python3 .github/scripts/prepare_package_matrix.py
 
@@ -83,14 +83,14 @@ jobs:
         env:
           PACKAGE_NAME: ${{ inputs.package }}
           PACKAGE_VERSION: ${{ inputs.version }}
-          RELEASE_DATE: ${{ needs.prepare.outputs.release_date }}
+          RELEASE_TIMESTAMP: ${{ needs.prepare.outputs.release_timestamp }}
         run: >-
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
-          --kind source --date "$RELEASE_DATE" --output dist
+          --kind source --timestamp "$RELEASE_TIMESTAMP" --output dist
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.package }}-${{ inputs.version }}-source-${{ needs.prepare.outputs.release_date }}-${{ needs.prepare.outputs.repo_sha_short }}
+          name: ${{ inputs.package }}-${{ inputs.version }}-source-${{ needs.prepare.outputs.release_timestamp }}-${{ needs.prepare.outputs.repo_sha_short }}
           path: dist/*
           if-no-files-found: error
           compression-level: 0
@@ -107,7 +107,7 @@ jobs:
     env:
       PACKAGE_NAME: ${{ inputs.package }}
       PACKAGE_VERSION: ${{ inputs.version }}
-      RELEASE_DATE: ${{ needs.prepare.outputs.release_date }}
+      RELEASE_TIMESTAMP: ${{ needs.prepare.outputs.release_timestamp }}
       BUILD_JOBS: ${{ inputs.jobs }}
       TARGET_PROFILE: ${{ matrix.target.id }}
     steps:
@@ -191,13 +191,13 @@ jobs:
           unset CFLAGS CXXFLAGS LDFLAGS
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION" \
             --kind binary --target "$TARGET_PROFILE" \
-            --date "$RELEASE_DATE" --jobs "$BUILD_JOBS" --output dist
+            --timestamp "$RELEASE_TIMESTAMP" --jobs "$BUILD_JOBS" --output dist
 
       - name: Build macOS binary
         if: ${{ matrix.target.family == 'macos' }}
         run: >-
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
-          --kind binary --target macos-arm64-min13 --date "$RELEASE_DATE"
+          --kind binary --target macos-arm64-min13 --timestamp "$RELEASE_TIMESTAMP"
           --jobs "$BUILD_JOBS" --output dist
 
       - name: Build Windows binary
@@ -205,19 +205,19 @@ jobs:
         shell: pwsh
         run: >-
           python scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
-          --kind binary --target windows-x86_64-md --date $env:RELEASE_DATE
+          --kind binary --target windows-x86_64-md --timestamp $env:RELEASE_TIMESTAMP
           --jobs $env:BUILD_JOBS --output dist
 
       - name: Build Android binary
         if: ${{ matrix.target.family == 'android' }}
         run: >-
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
-          --kind binary --target android-arm64-v8a-api26 --date "$RELEASE_DATE"
+          --kind binary --target android-arm64-v8a-api26 --timestamp "$RELEASE_TIMESTAMP"
           --jobs "$BUILD_JOBS" --output dist
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.package }}-${{ inputs.version }}-${{ matrix.target.id }}-${{ needs.prepare.outputs.release_date }}-${{ needs.prepare.outputs.repo_sha_short }}
+          name: ${{ inputs.package }}-${{ inputs.version }}-${{ matrix.target.id }}-${{ needs.prepare.outputs.release_timestamp }}-${{ needs.prepare.outputs.repo_sha_short }}
           path: dist/*
           if-no-files-found: error
           compression-level: 0
