@@ -623,6 +623,47 @@ index 1977ed7b..6eef6856 100644
          auto ret = raw_allocator_->Reallocate(p, size);
          if (not ret) {
              throw std::bad_alloc();
+diff --git a/src/impl/heap/memmove_heap.cpp b/src/impl/heap/memmove_heap.cpp
+index 9b023fc0..f625d269 100644
+--- a/src/impl/heap/memmove_heap.cpp
++++ b/src/impl/heap/memmove_heap.cpp
+@@ -15,7 +15,7 @@
+ 
+ #include "memmove_heap.h"
+ 
+-#include <cstring>
++#include <algorithm>
+ namespace vsag {
+ template <bool max_heap, bool fixed_size>
+ MemmoveHeap<max_heap, fixed_size>::MemmoveHeap(Allocator* allocator, int64_t max_size)
+@@ -37,10 +37,9 @@ MemmoveHeap<max_heap, fixed_size>::Push(float dist, InnerIdType id) {
+                                         record,
+                                         CompareType()) -
+                        this->ordered_buffer_.begin();
+-            // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-            memmove(ordered_buffer_.data() + pos + 1,
+-                    ordered_buffer_.data() + pos,
+-                    (max_size_ - pos) * sizeof(DistanceRecord));
++            std::move_backward(ordered_buffer_.begin() + pos,
++                               ordered_buffer_.begin() + max_size_,
++                               ordered_buffer_.begin() + max_size_ + 1);
+             ordered_buffer_[pos] = record;
+             this->cur_size_++;
+             if (this->Size() > this->max_size_) {
+@@ -54,10 +53,9 @@ MemmoveHeap<max_heap, fixed_size>::Push(float dist, InnerIdType id) {
+                 this->ordered_buffer_.begin(), this->ordered_buffer_.end(), record, CompareType()) -
+             this->ordered_buffer_.begin();
+         ordered_buffer_.emplace_back(record);
+-        // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-        memmove(ordered_buffer_.data() + pos + 1,
+-                ordered_buffer_.data() + pos,
+-                (cur_size_ - pos) * sizeof(DistanceRecord));
++        std::move_backward(ordered_buffer_.begin() + pos,
++                           ordered_buffer_.begin() + cur_size_,
++                           ordered_buffer_.begin() + cur_size_ + 1);
+         ordered_buffer_[pos] = record;
+         cur_size_++;
+     }
 diff --git a/src/index/index_impl_test.cpp b/src/index/index_impl_test.cpp
 index a813735f..91d47f78 100644
 --- a/src/index/index_impl_test.cpp
@@ -662,58 +703,248 @@ index 199731c2..79b4aa82 100644
      target_compile_definitions (io PUBLIC -DHAVE_LIBAIO=1)
      target_link_libraries (io PUBLIC fmt::fmt aio coverage_config)
 diff --git a/src/io/buffer_io.cpp b/src/io/buffer_io.cpp
-index 9cd53f41..5cfa9f38 100644
+index 9cd53f41..31512c3c 100644
 --- a/src/io/buffer_io.cpp
 +++ b/src/io/buffer_io.cpp
-@@ -44,7 +44,7 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
+@@ -16,9 +16,16 @@
+ #include "buffer_io.h"
+ 
+ #include <fcntl.h>
++#if defined(_WIN32)
++#include <io.h>
++#include <sys/stat.h>
++#else
+ #include <unistd.h>
++#endif
+ 
++#include <algorithm>
+ #include <filesystem>
++#include <limits>
+ 
+ namespace vsag {
+ 
+@@ -29,7 +36,11 @@ BufferIO::BufferIO(std::string filename, Allocator* allocator)
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("{} is a directory", this->filepath_));
+     }
++#if defined(_WIN32)
++    this->fd_ = _open(filepath_.c_str(), _O_CREAT | _O_RDWR | _O_BINARY, _S_IREAD | _S_IWRITE);
++#else
+     this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
++#endif
+     if (this->fd_ < 0) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
+@@ -44,7 +55,22 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
  
  void
  BufferIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
 -    auto ret = pwrite64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before write failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int written = _write(this->fd_, data + ret, chunk);
++        if (written <= 0) break;
++        ret += written;
++    }
++#else
 +    auto ret = pwrite(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
      if (ret != size) {
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("write bytes {} less than {}", ret, size));
-@@ -59,7 +59,7 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
+@@ -59,7 +85,22 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
      if (size == 0) {
          return true;
      }
 -    auto ret = pread64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before read failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int received = _read(this->fd_, data + ret, chunk);
++        if (received <= 0) break;
++        ret += received;
++    }
++#else
 +    auto ret = pread(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
      if (ret != size) {
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("read bytes {} less than {}", ret, size));
+diff --git a/src/io/buffer_io.h b/src/io/buffer_io.h
+index 9f36f7d8..43c7e754 100644
+--- a/src/io/buffer_io.h
++++ b/src/io/buffer_io.h
+@@ -15,7 +15,12 @@
+ 
+ #pragma once
+ 
++#if defined(_WIN32)
++#include <io.h>
++#include <mutex>
++#else
+ #include <unistd.h>
++#endif
+ 
+ #include <filesystem>
+ 
+@@ -38,7 +43,11 @@ public:
+     explicit BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param);
+ 
+     ~BufferIO() override {
++#if defined(_WIN32)
++        _close(this->fd_);
++#else
+         close(this->fd_);
++#endif
+         // remove file
+         if (not this->exist_file_) {
+             std::filesystem::remove(this->filepath_);
+@@ -66,5 +75,9 @@ private:
+     int fd_{-1};
+ 
+     bool exist_file_{false};
++
++#if defined(_WIN32)
++    mutable std::mutex io_mutex_;
++#endif
+ };
+ }  // namespace vsag
 diff --git a/src/io/mmap_io.cpp b/src/io/mmap_io.cpp
-index 1ed8a547..04ed5460 100644
+index 1ed8a547..5c6e2b57 100644
 --- a/src/io/mmap_io.cpp
 +++ b/src/io/mmap_io.cpp
-@@ -42,9 +42,9 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+@@ -16,8 +16,15 @@
+ #include "mmap_io.h"
+ 
+ #include <fcntl.h>
++#if defined(_WIN32)
++#include <io.h>
++#include <sys/stat.h>
++#define NOMINMAX
++#include <windows.h>
++#else
+ #include <sys/mman.h>
+ #include <unistd.h>
++#endif
+ 
+ #include <filesystem>
+ #include <utility>
+@@ -26,6 +33,28 @@
+ 
+ namespace vsag {
+ 
++#if defined(_WIN32)
++static uint8_t*
++map_file(int fd, uint64_t size) {
++    const auto file = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
++    HANDLE mapping = CreateFileMappingW(file,
++                                        nullptr,
++                                        PAGE_READWRITE,
++                                        static_cast<DWORD>(size >> 32),
++                                        static_cast<DWORD>(size),
++                                        nullptr);
++    if (mapping == nullptr) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "CreateFileMapping failed");
++    }
++    void* address = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
++    CloseHandle(mapping);
++    if (address == nullptr) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "MapViewOfFile failed");
++    }
++    return static_cast<uint8_t*>(address);
++}
++#endif
++
+ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+     : BasicIO<MMapIO>(allocator), filepath_(std::move(filename)) {
+     this->exist_file_ = std::filesystem::exists(this->filepath_);
+@@ -34,7 +63,11 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+                             fmt::format("{} is a directory", this->filepath_));
+     }
+ 
++#if defined(_WIN32)
++    this->fd_ = _open(filepath_.c_str(), _O_CREAT | _O_RDWR | _O_BINARY, _S_IREAD | _S_IWRITE);
++#else
+     this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
++#endif
+     if (this->fd_ < 0) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
+@@ -42,13 +75,21 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
      auto mmap_size = this->size_;
      if (this->size_ == 0) {
          mmap_size = DEFAULT_INIT_MMAP_SIZE;
 -        auto ret = ftruncate64(this->fd_, static_cast<int64_t>(mmap_size));
-+        auto ret = ftruncate(this->fd_, static_cast<off_t>(mmap_size));
-         if (ret == -1) {
+-        if (ret == -1) {
 -            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate64 failed");
++#if defined(_WIN32)
++        auto ret = _chsize_s(this->fd_, mmap_size);
++#else
++        auto ret = ftruncate(this->fd_, static_cast<off_t>(mmap_size));
++#endif
++        if (ret != 0) {
 +            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate failed");
          }
      }
++#if defined(_WIN32)
++    this->start_ = map_file(this->fd_, mmap_size);
++#else
      void* addr = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd_, 0);
-@@ -74,12 +74,21 @@ MMapIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+     this->start_ = static_cast<uint8_t*>(addr);
++#endif
+ }
+ 
+ MMapIO::MMapIO(const MMapIOParamPtr& io_param, const IndexCommonParam& common_param)
+@@ -58,8 +99,13 @@ MMapIO::MMapIO(const IOParamPtr& param, const IndexCommonParam& common_param)
+     : MMapIO(std::dynamic_pointer_cast<MMapIOParameter>(param), common_param){};
+ 
+ MMapIO::~MMapIO() {
++#if defined(_WIN32)
++    UnmapViewOfFile(this->start_);
++    _close(this->fd_);
++#else
+     munmap(this->start_, this->size_);
+     close(this->fd_);
++#endif
+     // remove file
+     if (not this->exist_file_) {
+         std::filesystem::remove(this->filepath_);
+@@ -74,12 +120,28 @@ MMapIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
          old_size = DEFAULT_INIT_MMAP_SIZE;
      }
      if (new_size > old_size) {
 -        auto ret = ftruncate64(this->fd_, static_cast<int64_t>(new_size));
-+        auto ret = ftruncate(this->fd_, static_cast<off_t>(new_size));
-         if (ret == -1) {
+-        if (ret == -1) {
 -            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate64 failed");
++#if defined(_WIN32)
++        UnmapViewOfFile(this->start_);
++        auto ret = _chsize_s(this->fd_, new_size);
++#else
++        auto ret = ftruncate(this->fd_, static_cast<off_t>(new_size));
++#endif
++        if (ret != 0) {
 +            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate failed");
-         }
-+#if defined(__APPLE__)
++        }
++#if defined(_WIN32)
++        this->start_ = map_file(this->fd_, new_size);
++#elif defined(__APPLE__)
 +        void* new_mapping = mmap(nullptr, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd_, 0);
 +        if (new_mapping == MAP_FAILED) {
 +            throw VsagException(ErrorType::INTERNAL_ERROR, "mmap failed");
-+        }
+         }
 +        munmap(this->start_, old_size);
 +        this->start_ = static_cast<uint8_t*>(new_mapping);
 +#else
@@ -723,7 +954,7 @@ index 1ed8a547..04ed5460 100644
      }
      this->size_ = std::max(this->size_, new_size);
      memcpy(this->start_ + offset, data, size);
-@@ -115,4 +124,4 @@ MMapIO::MultiReadImpl(uint8_t* datas, uint64_t* sizes, uint64_t* offsets, uint64
+@@ -115,4 +177,4 @@ MMapIO::MultiReadImpl(uint8_t* datas, uint64_t* sizes, uint64_t* offsets, uint64
      return ret;
  }
  
