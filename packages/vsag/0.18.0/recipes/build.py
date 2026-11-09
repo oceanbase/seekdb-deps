@@ -68,13 +68,14 @@ def build(ctx):
         targets = ("vsag_static", "fmt", "io_static") if ctx.target.family == "macos" else ("vsag_static", "fmt")
         ctx.cmake(options=options, targets=targets)
     except subprocess.CalledProcessError:
-        for log in sorted(ctx.build_dir.rglob("*-configure-*.log")) + sorted(
-            ctx.build_dir.rglob("*-build-*.log")
-        ):
+        logs = sorted(ctx.build_dir.rglob("*-configure-*.log"))
+        logs += sorted(ctx.build_dir.rglob("*-build-*.log"))
+        logs += sorted(ctx.build_dir.rglob("*-install-*.log"))
+        for log in logs:
             print("VSAG dependency log: " + str(log), file=sys.stderr)
             lines = log.read_text(errors="replace").splitlines()
             for index, line in enumerate(lines):
-                if any(word in line.lower() for word in ("failed:", "error:", "fatal error", "undefined")):
+                if any(word in line.lower() for word in ("failed:", "error:", "error c", "fatal error", "undefined")):
                     print("\n".join(lines[max(0, index - 2):index + 5]), file=sys.stderr)
             print("\n".join(lines[-20:]), file=sys.stderr)
         raise
