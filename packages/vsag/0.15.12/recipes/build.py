@@ -7,15 +7,6 @@ import subprocess
 import sys
 
 
-FETCHCONTENT_SOURCES = {
-    "NLOHMANN_JSON": "json",
-    "CPUINFO": "cpuinfo",
-    "FMT": "fmt",
-    "THREAD_POOL": "thread_pool",
-    "TSL": "tsl",
-    "ROARINGBITMAP": "roaringbitmap",
-}
-
 LIBRARIES = {
     "libvsag_static.a": ("src/libvsag_static.a",),
     "libsimd.a": ("src/simd/libsimd.a",),
@@ -31,16 +22,16 @@ LIBRARIES = {
 }
 
 THIRD_PARTY_LICENSES = {
-    "antlr4": ("LICENSE.txt",),
-    "boost": ("LICENSE_1_0.txt",),
-    "openblas": ("LICENSE", "GotoBLAS_00License.txt", "lapack-netlib/LICENSE"),
-    "spdlog": ("LICENSE",),
-    "json": ("LICENSE.MIT",),
-    "cpuinfo": ("LICENSE", "deps/clog/LICENSE"),
-    "fmt": ("LICENSE",),
-    "thread_pool": ("COPYING",),
-    "tsl": ("LICENSE",),
-    "roaringbitmap": ("LICENSE",),
+    "antlr4": ("antlr4/source", ("LICENSE.txt",)),
+    "boost": ("boost/source", ("LICENSE_1_0.txt",)),
+    "openblas": ("openblas/source", ("LICENSE", "GotoBLAS_00License.txt", "lapack-netlib/LICENSE")),
+    "spdlog": ("spdlog/source", ("LICENSE",)),
+    "json": ("_deps/nlohmann_json-src", ("LICENSE.MIT",)),
+    "cpuinfo": ("_deps/cpuinfo-src", ("LICENSE", "deps/clog/LICENSE")),
+    "fmt": ("_deps/fmt-src", ("LICENSE",)),
+    "thread_pool": ("_deps/thread_pool-src", ("COPYING",)),
+    "tsl": ("_deps/tsl-src", ("LICENSE",)),
+    "roaringbitmap": ("_deps/roaringbitmap-src", ("LICENSE",)),
 }
 
 
@@ -90,13 +81,7 @@ def build(ctx):
         "ENABLE_TOOLS": False,
         "ROARING_DISABLE_AVX512": True,
         "NUM_BUILDING_JOBS": ctx.jobs,
-        "FETCHCONTENT_FULLY_DISCONNECTED": True,
     }
-    for content_name, directory in FETCHCONTENT_SOURCES.items():
-        source = ctx.source_dir / ("vendor_" + directory)
-        if not source.is_dir():
-            raise ValueError("Pinned VSAG dependency source is missing: " + str(source))
-        options["FETCHCONTENT_SOURCE_DIR_" + content_name] = str(source)
 
     try:
         ctx.cmake(options=options, targets=("vsag_static", "fmt"))
@@ -136,10 +121,10 @@ def build(ctx):
     for archive in staged_libraries:
         ctx.run([strip_tool, "--strip-debug", str(archive)])
 
-    for dependency, licenses in THIRD_PARTY_LICENSES.items():
+    for dependency, (source_path, licenses) in THIRD_PARTY_LICENSES.items():
         for relative in licenses:
             ctx.install(
-                ctx.source_dir / ("vendor_" + dependency) / relative,
+                ctx.build_dir / "cmake" / source_path / relative,
                 "share/licenses/vsag/third-party/" + dependency + "/" + relative,
             )
     for relative in ("LICENSE", "NOTICE.txt"):

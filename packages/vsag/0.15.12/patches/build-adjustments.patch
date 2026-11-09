@@ -1,0 +1,37 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7ca61cb..c52d781 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -188,7 +188,9 @@ include (extern/openblas/openblas.cmake)
+ include (extern/mkl/mkl.cmake)
+ include (extern/diskann/diskann.cmake)
+ include (extern/spdlog/spdlog.cmake)
+-include (extern/catch2/catch2.cmake)
++if (ENABLE_TESTS)
++    include (extern/catch2/catch2.cmake)
++endif ()
+ include (extern/cpuinfo/cpuinfo.cmake)
+ include (extern/fmt/fmt.cmake)
+ include (extern/thread_pool/thread_pool.cmake)
+@@ -312,9 +314,10 @@ endif ()
+ # version
+ find_package (Git)
+ add_custom_target (version
+-        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
++        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.15.12 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
+         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+ )
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+index 5581113..fa401de 100644
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -1,4 +1,4 @@
+-if(GIT_EXECUTABLE)
++if(GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component(SRC_DIR ${SRC} DIRECTORY)
+   # Generate a git-describe version string from Git repository tags
+   execute_process(
