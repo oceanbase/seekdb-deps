@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import PurePosixPath
 from urllib.request import Request, urlopen
 
@@ -139,16 +140,32 @@ def repository_commit():
 
 
 def download_source_archive(source, workspace, filename="upstream-source.tar.gz"):
+    expected_sha256 = source["archive_sha256"].lower()
+    cache_directory = os.environ.get("SEEKDB_DEPS_SOURCE_CACHE")
+    cache_path = Path(cache_directory).expanduser() / expected_sha256 if cache_directory else None
+    if cache_path is not None and cache_path.exists():
+        actual_sha256 = sha256(cache_path)
+        if actual_sha256 != expected_sha256:
+            raise ValueError("Cached source SHA256 mismatch: " + str(cache_path))
+        return cache_path
+
     archive_path = workspace / filename
     request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
-    with urlopen(request, timeout=120) as response:
-        if not response.geturl().startswith("https://"):
-            raise ValueError("Package source download did not remain on HTTPS")
-        with archive_path.open("wb") as output:
-            shutil.copyfileobj(response, output)
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=120) as response:
+                if not response.geturl().startswith("https://"):
+                    raise ValueError("Package source download did not remain on HTTPS")
+                with archive_path.open("wb") as output:
+                    shutil.copyfileobj(response, output)
+            break
+        except OSError:
+            archive_path.unlink(missing_ok=True)
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
 
     actual_sha256 = sha256(archive_path)
-    expected_sha256 = source["archive_sha256"].lower()
     if actual_sha256 != expected_sha256:
         archive_path.unlink()
         raise ValueError(
@@ -156,6 +173,15 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
                 expected_sha256, actual_sha256
             )
         )
+    if cache_path is not None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=str(cache_path.parent), delete=False) as temporary:
+            temporary_path = Path(temporary.name)
+        try:
+            shutil.copyfile(str(archive_path), str(temporary_path))
+            os.replace(str(temporary_path), str(cache_path))
+        finally:
+            temporary_path.unlink(missing_ok=True)
     return archive_path
 
 

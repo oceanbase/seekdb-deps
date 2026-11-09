@@ -136,3 +136,8 @@ def build(ctx):
             ctx.source_dir / "extern/diskann/DiskANN" / relative,
             "share/licenses/vsag/third-party/diskann/" + relative,
         )
+    license_directory = Path(__file__).resolve().parents[1] / "licenses"
+    for name in ("COPYING3", "COPYING.RUNTIME"):
+        staged_license = ctx.build_dir / name
+        shutil.copyfile(license_directory / name, staged_license)
+        ctx.install(staged_license, "share/licenses/vsag/third-party/gcc/" + name)
