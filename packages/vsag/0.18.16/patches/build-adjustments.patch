@@ -720,6 +720,139 @@ index c8a28175..82de2bad 100644
      CHECK_ARGUMENT(  // NOLINT
          (1 <= parsed_param.ef_search) and (parsed_param.ef_search <= ef_search_threshold),
          fmt::format(
+diff --git a/src/algorithm/sindi/sindi.cpp b/src/algorithm/sindi/sindi.cpp
+index 140872e0..5c92b5bd 100644
+--- a/src/algorithm/sindi/sindi.cpp
++++ b/src/algorithm/sindi/sindi.cpp
+@@ -268,7 +268,7 @@ SINDI::search_impl(const SparseTermComputerPtr& computer,
+                 term_list->InsertHeapByTermLists<mode, WITH_FILTER>(
+                     dists.data(), computer, heap, inner_param, window_start_id);
+             } else {
+-                term_list->InsertHeapByTermLists<mode, PURE>(
++                term_list->InsertHeapByTermLists<mode, PURE_SEARCH>(
+                     dists.data(), computer, heap, inner_param, window_start_id);
+             }
+         } else {
+@@ -276,7 +276,7 @@ SINDI::search_impl(const SparseTermComputerPtr& computer,
+                 term_list->InsertHeapByDists<mode, WITH_FILTER>(
+                     dists.data(), dists.size(), heap, inner_param, window_start_id);
+             } else {
+-                term_list->InsertHeapByDists<mode, PURE>(
++                term_list->InsertHeapByDists<mode, PURE_SEARCH>(
+                     dists.data(), dists.size(), heap, inner_param, window_start_id);
+             }
+         }
+diff --git a/src/datacell/sparse_term_datacell.cpp b/src/datacell/sparse_term_datacell.cpp
+index 872df25b..aca3ceda 100644
+--- a/src/datacell/sparse_term_datacell.cpp
++++ b/src/datacell/sparse_term_datacell.cpp
+@@ -482,7 +482,7 @@ SparseTermDataCell::Decode(const uint8_t* src, size_t size, float* dst) const {
+ }
+ 
+ template void
+-SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     const SparseTermComputerPtr& computer,
+     MaxHeap& heap,
+@@ -499,7 +499,7 @@ SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH,
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     const SparseTermComputerPtr& computer,
+     MaxHeap& heap,
+@@ -516,7 +516,7 @@ SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH,
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     uint32_t dists_size,
+     MaxHeap& heap,
+@@ -532,7 +532,7 @@ SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchTy
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByDists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByDists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     uint32_t dists_size,
+     MaxHeap& heap,
+diff --git a/src/datacell/sparse_term_datacell.h b/src/datacell/sparse_term_datacell.h
+index 77003593..0ce0a51f 100644
+--- a/src/datacell/sparse_term_datacell.h
++++ b/src/datacell/sparse_term_datacell.h
+@@ -59,7 +59,7 @@ public:
+      * @param offset_id Offset to add to inner IDs when inserting into heap
+      */
+     template <InnerSearchMode mode = InnerSearchMode::KNN_SEARCH,
+-              InnerSearchType type = InnerSearchType::PURE>
++              InnerSearchType type = InnerSearchType::PURE_SEARCH>
+     void
+     InsertHeapByTermLists(float* dists,
+                           const SparseTermComputerPtr& computer,
+@@ -77,7 +77,7 @@ public:
+      * @param offset_id Offset to add to inner IDs when inserting into heap
+      */
+     template <InnerSearchMode mode = InnerSearchMode::KNN_SEARCH,
+-              InnerSearchType type = InnerSearchType::PURE>
++              InnerSearchType type = InnerSearchType::PURE_SEARCH>
+     void
+     InsertHeapByDists(float* dists,
+                       uint32_t dists_size,
+diff --git a/src/datacell/sparse_term_datacell_test.cpp b/src/datacell/sparse_term_datacell_test.cpp
+index 6bfde463..f32de5ec 100644
+--- a/src/datacell/sparse_term_datacell_test.cpp
++++ b/src/datacell/sparse_term_datacell_test.cpp
+@@ -139,7 +139,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists(count_base, 0);
+         data_cell->Query(dists.data(), computer);
+ 
+-        data_cell->InsertHeapByTermLists<KNN_SEARCH, PURE>(
++        data_cell->InsertHeapByTermLists<KNN_SEARCH, PURE_SEARCH>(
+             dists.data(), computer, heap, inner_param, 0);
+         REQUIRE(heap.size() == topk);
+ 
+@@ -159,7 +159,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists2(count_base, 0);
+         data_cell->Query(dists2.data(), computer);
+         MaxHeap heap2(allocator.get());
+-        data_cell->InsertHeapByDists<KNN_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<KNN_SEARCH, PURE_SEARCH>(
+             dists2.data(), dists2.size(), heap2, inner_param, 0);
+ 
+         // Extract results from InsertHeapByDists
+@@ -188,7 +188,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         inner_param.radius = dists[pos];
+         MaxHeap heap(allocator.get());
+ 
+-        data_cell->InsertHeapByTermLists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByTermLists<RANGE_SEARCH, PURE_SEARCH>(
+             dists.data(), computer, heap, inner_param, 0);
+         REQUIRE(heap.size() == range_topk);
+ 
+@@ -207,7 +207,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists2(count_base, 0);
+         data_cell->Query(dists2.data(), computer);
+         MaxHeap heap2(allocator.get());
+-        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE_SEARCH>(
+             dists2.data(), dists2.size(), heap2, inner_param, 0);
+ 
+         // Extract results from InsertHeapByDists
+@@ -236,7 +236,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         dists[7] = -0.5F;
+         MaxHeap heap(allocator.get());
+ 
+-        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE_SEARCH>(
+             dists.data(), dists.size(), heap, inner_param, 0);
+ 
+         REQUIRE(heap.size() == 2);
 diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
 index 09a119b5..0b6fe127 100644
 --- a/src/impl/allocator/default_allocator.cpp
@@ -870,6 +1003,19 @@ index 9b023fc0..f625d269 100644
          ordered_buffer_[pos] = record;
          cur_size_++;
      }
+diff --git a/src/impl/inner_search_param.h b/src/impl/inner_search_param.h
+index 181e636e..86d9374c 100644
+--- a/src/impl/inner_search_param.h
++++ b/src/impl/inner_search_param.h
+@@ -30,7 +30,7 @@ DEFINE_POINTER(Executor);
+ 
+ enum InnerSearchMode { KNN_SEARCH = 1, RANGE_SEARCH = 2 };
+ 
+-enum InnerSearchType { PURE = 1, WITH_FILTER = 2 };
++enum InnerSearchType { PURE_SEARCH = 1, WITH_FILTER = 2 };
+ 
+ class InnerSearchParam {
+ public:
 diff --git a/src/index/hnsw.cpp b/src/index/hnsw.cpp
 index 769f3bee..773e1705 100644
 --- a/src/index/hnsw.cpp
