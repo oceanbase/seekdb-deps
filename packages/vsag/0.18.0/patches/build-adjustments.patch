@@ -720,6 +720,39 @@ index 1ed8a547..04ed5460 100644
 -}  // namespace vsag
 \ No newline at end of file
 +}  // namespace vsag
+diff --git a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+index 38690d8f..9c30bf5e 100644
+--- a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
++++ b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+@@ -66,7 +66,7 @@ PQFastScanQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t coun
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+diff --git a/src/quantization/product_quantization/product_quantizer.cpp b/src/quantization/product_quantization/product_quantizer.cpp
+index e65a13d2..b5e98d9c 100644
+--- a/src/quantization/product_quantization/product_quantizer.cpp
++++ b/src/quantization/product_quantization/product_quantizer.cpp
+@@ -61,7 +61,7 @@ ProductQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t count)
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+@@ -375,4 +375,4 @@ ProductQuantizer<metric>::ProcessQueryImpl(const DataType* query,
+ }
+ 
+ TEMPLATE_QUANTIZER(ProductQuantizer)
+-}  // namespace vsag
+\ No newline at end of file
++}  // namespace vsag
 diff --git a/src/quantization/quantizer_adapter.cpp b/src/quantization/quantizer_adapter.cpp
 index 5043c545..722e8f30 100644
 --- a/src/quantization/quantizer_adapter.cpp
@@ -733,6 +766,24 @@ index 5043c545..722e8f30 100644
      if constexpr (std::is_same_v<DataT, int8_t>) {
          const auto* data_int8 = reinterpret_cast<const int8_t*>(data);
          Vector<DataType> vec(this->dim_ * count, this->allocator_);
+diff --git a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+index 15ae4ee7..1e021066 100644
+--- a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
++++ b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+@@ -33,11 +33,11 @@ SQ8UniformQuantizer<metric>::SQ8UniformQuantizer(int dim, Allocator* allocator)
+ 
+     uint64_t align_size = 1;
+     if constexpr (metric == MetricType::METRIC_TYPE_L2SQR) {
+-        align_size = std::max(align_size, sizeof(norm_type));
++        align_size = std::max<uint64_t>(align_size, sizeof(norm_type));
+     }
+     if constexpr (metric == MetricType::METRIC_TYPE_IP or
+                   metric == MetricType::METRIC_TYPE_COSINE) {
+-        align_size = std::max(align_size, sizeof(sum_type));
++        align_size = std::max<uint64_t>(align_size, sizeof(sum_type));
+     }
+     this->code_size_ = 0;
+ 
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 10075a1c..92f5b507 100644
 --- a/src/simd/CMakeLists.txt
