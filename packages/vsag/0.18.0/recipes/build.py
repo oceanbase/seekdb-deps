@@ -65,7 +65,8 @@ def build(ctx):
         "NUM_BUILDING_JOBS": ctx.jobs,
     }
     try:
-        ctx.cmake(options=options, targets=("vsag_static", "fmt"))
+        targets = ("vsag_static", "fmt", "io_static") if ctx.target.family == "macos" else ("vsag_static", "fmt")
+        ctx.cmake(options=options, targets=targets)
     except subprocess.CalledProcessError:
         for log in sorted(ctx.build_dir.rglob("*-configure-*.log")) + sorted(
             ctx.build_dir.rglob("*-build-*.log")

@@ -488,3 +488,13 @@ index 10075a1c..e6cededc 100644
  
  add_library (simd STATIC ${SIMD_SRCS})
  
+diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
+index 199731c2..79b4aa82 100644
+--- a/src/io/CMakeLists.txt
++++ b/src/io/CMakeLists.txt
+@@ -33,0 +34,5 @@ add_library (io OBJECT ${IO_SRC})
++if (APPLE)
++    # Preserve the archive expected by seekdb's macOS link inputs.
++    add_library (io_static STATIC $<TARGET_OBJECTS:io>)
++    set_target_properties (io_static PROPERTIES OUTPUT_NAME io)
++endif ()
