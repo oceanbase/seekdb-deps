@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import sys
 
 
 LIBRARIES = {
@@ -63,7 +64,15 @@ def build(ctx):
         "ROARING_DISABLE_AVX512": True,
         "NUM_BUILDING_JOBS": ctx.jobs,
     }
-    ctx.cmake(options=options, targets=("vsag_static", "fmt"))
+    try:
+        ctx.cmake(options=options, targets=("vsag_static", "fmt"))
+    except subprocess.CalledProcessError:
+        for log in sorted(ctx.build_dir.rglob("*-configure-*.log")) + sorted(
+            ctx.build_dir.rglob("*-build-*.log")
+        ):
+            print("VSAG dependency log: " + str(log), file=sys.stderr)
+            print(log.read_text(errors="replace")[-12000:], file=sys.stderr)
+        raise
 
     for header in sorted((ctx.source_dir / "include/vsag").iterdir()):
         if header.is_file():
@@ -72,6 +81,13 @@ def build(ctx):
     libraries = WINDOWS_LIBRARIES if ctx.target.family == "windows" else LIBRARIES
     for name, candidates in libraries.items():
         ctx.install(_built_library(ctx, candidates), "lib/" + name)
+    if ctx.target.family == "macos":
+        ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
+    if ctx.target.family == "android":
+        ctx.install(
+            _built_library(ctx, ("spdlog/install/lib/libspdlog.a",)),
+            "lib/libspdlog.a",
+        )
 
     for dependency, (source_path, licenses) in THIRD_PARTY_LICENSES.items():
         for relative in licenses:
