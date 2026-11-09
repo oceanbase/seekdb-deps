@@ -23,21 +23,21 @@
   },
   "required_artifacts": {
     "default": [
-      "usr/local/oceanbase/devtools/bin/clang",
-      "usr/local/oceanbase/devtools/bin/clang++",
-      "usr/local/oceanbase/devtools/bin/lld",
-      "usr/local/oceanbase/devtools/bin/ld.lld",
-      "usr/local/oceanbase/devtools/bin/llvm-ar",
-      "usr/local/oceanbase/devtools/bin/llvm-cov",
-      "usr/local/oceanbase/devtools/bin/llvm-cxxfilt",
-      "usr/local/oceanbase/devtools/bin/llvm-dwp",
-      "usr/local/oceanbase/devtools/bin/llvm-nm",
-      "usr/local/oceanbase/devtools/bin/llvm-objcopy",
-      "usr/local/oceanbase/devtools/bin/llvm-objdump",
-      "usr/local/oceanbase/devtools/bin/llvm-ranlib",
-      "usr/local/oceanbase/devtools/bin/llvm-strip",
-      "usr/local/oceanbase/devtools/lib/libLLVM-17.so",
-      "usr/local/oceanbase/devtools/lib/clang/17/include/stddef.h"
+      "devtools/bin/clang",
+      "devtools/bin/clang++",
+      "devtools/bin/lld",
+      "devtools/bin/ld.lld",
+      "devtools/bin/llvm-ar",
+      "devtools/bin/llvm-cov",
+      "devtools/bin/llvm-cxxfilt",
+      "devtools/bin/llvm-dwp",
+      "devtools/bin/llvm-nm",
+      "devtools/bin/llvm-objcopy",
+      "devtools/bin/llvm-objdump",
+      "devtools/bin/llvm-ranlib",
+      "devtools/bin/llvm-strip",
+      "devtools/lib/libLLVM-17.so",
+      "devtools/lib/clang/17/include/stddef.h"
     ]
   }
 }

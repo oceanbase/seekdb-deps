@@ -5,7 +5,7 @@ import shutil
 import subprocess
 
 
-PREFIX = Path("usr/local/oceanbase/devtools")
+PREFIX = Path("devtools")
 TOOLS = (
     "clang", "lld", "llvm-ar", "llvm-cov", "llvm-cxxfilt", "llvm-dwp",
     "llvm-nm", "llvm-objcopy", "llvm-objdump",
