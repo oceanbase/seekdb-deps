@@ -86,7 +86,7 @@ def build(ctx):
     try:
         ctx.cmake(options=options, targets=("vsag_static", "fmt"))
     except subprocess.CalledProcessError:
-        for log in sorted((ctx.build_dir / "cmake/openblas/src/openblas-stamp").glob("openblas-build-*.log")):
+        for log in sorted((ctx.build_dir / "openblas/src/openblas-stamp").glob("openblas-build-*.log")):
             print("OpenBLAS build log: " + str(log), file=sys.stderr)
             print(log.read_text(errors="replace")[-16000:], file=sys.stderr)
         raise
@@ -124,7 +124,7 @@ def build(ctx):
     for dependency, (source_path, licenses) in THIRD_PARTY_LICENSES.items():
         for relative in licenses:
             ctx.install(
-                ctx.build_dir / "cmake" / source_path / relative,
+                ctx.build_dir / source_path / relative,
                 "share/licenses/vsag/third-party/" + dependency + "/" + relative,
             )
     for relative in ("LICENSE", "NOTICE.txt"):
