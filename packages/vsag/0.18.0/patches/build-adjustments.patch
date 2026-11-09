@@ -1,0 +1,45 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a8f9010..b6e6f0e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -230,7 +230,9 @@ include (extern/openblas/openblas.cmake)
+ include (extern/mkl/mkl.cmake)
+ include (extern/diskann/diskann.cmake)
+ include (extern/spdlog/spdlog.cmake)
+-include (extern/catch2/catch2.cmake)
++if (ENABLE_TESTS)
++    include (extern/catch2/catch2.cmake)
++endif ()
+ include (extern/cpuinfo/cpuinfo.cmake)
+ include (extern/fmt/fmt.cmake)
+ include (extern/thread_pool/thread_pool.cmake)
+@@ -374,9 +376,10 @@ endif ()
+ # version
+ find_package (Git)
+ add_custom_target (version
+-        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
++        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.0 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
+         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+ )
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
+diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
+index 3db31ed..5e616c7 100644
+--- a/extern/openblas/openblas.cmake
++++ b/extern/openblas/openblas.cmake
+@@ -5,11 +5,8 @@ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+ 
+ ExternalProject_Add(
+     ${name}
+-    URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.23/OpenBLAS-0.3.23.tar.gz
+-        # this url is maintained by the vsag project, if it's broken, please try
+-        #  the latest commit or contact the vsag project
+-        http://vsagcache.oss-rg-china-mainland.aliyuncs.com/openblas/OpenBLAS-0.3.23.tar.gz
+-    URL_HASH MD5=115634b39007de71eb7e75cf7591dfb2
++    URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
++    URL_HASH SHA256=5d9491d07168a5d00116cdc068a40022c3455bf9293c7cb86a65b1054d7e5114
+     DOWNLOAD_NAME OpenBLAS-v0.3.23.tar.gz
+     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
+     TMP_DIR ${BUILD_INFO_DIR}

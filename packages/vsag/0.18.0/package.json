@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "name": "vsag",
+  "version": "0.18.0",
+  "supported_targets": [
+    "macos-arm64-min13",
+    "windows-x86_64-md",
+    "android-arm64-v8a-api26"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.18.0",
+    "repository": "https://github.com/antgroup/vsag.git",
+    "tag": "v0.18.0",
+    "revision": "9f7dca17dbb0cce2344f2ecef9e114b2c2ced523",
+    "archive_sha256": "fd15c30e78d972397e900a349f3144a9c513e8ad79d894a6003434e22138ecbd",
+    "strip_prefix": "vsag-0.18.0"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [
+    "patches/build-adjustments.patch"
+  ],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "macos": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "windows": [
+      "include/vsag/vsag.h",
+      "lib/vsag_static.lib",
+      "lib/simd.lib",
+      "lib/cpuinfo.lib",
+      "lib/diskann.lib",
+      "lib/openblas.lib",
+      "lib/antlr4-runtime-static.lib",
+      "lib/antlr4-autogen.lib",
+      "lib/fmt.lib"
+    ],
+    "android": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ]
+  }
+}
