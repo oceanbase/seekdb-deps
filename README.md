@@ -20,11 +20,11 @@ platforms/<target>.json   target ABI, C flags, and supported build hosts
 
 Package recipes use `RecipeContext.cmake(...)` for the configure/build lifecycle, `ctx.run(...)` for an upstream-specific command, and `ctx.install(source, relative_path)` to add an output to the package. They do not manage temporary directories, patches, license placement, manifests, checksums, or archives. The package runner initializes the build environment before downloading source or invoking a recipe. `scripts/init_build_env.py` selects or loads host compiler settings, checks minimum tool versions, and prepares the target-specific CMake arguments.
 
-Binary archives have one package-version directory containing relative `include/`, `lib/`, `bin/`, and `share/` paths. They have no fixed installation prefix; consumers extract the archive into their chosen dependency directory. Build workspaces and staging files are created under temporary output directories, not under the checked-out package sources.
+Binary archives have one package-version directory containing relative `include/`, `lib/`, `lib64/`, `bin/`, and `share/` paths. They have no fixed installation prefix; consumers extract the archive into their chosen dependency directory. Build workspaces and staging files are created under temporary output directories, not under the checked-out package sources.
 
 ## Build and package
 
-The command requires Python 3.8 or newer. Binary builds also require CMake 3.22.1 or newer and Ninja. The package runner downloads each package's HTTPS source archive, checks its SHA256, and extracts the declared top-level directory. `--kind source` creates a source bundle without a compiler or target; the bundle includes the verified package source, recipe, target profiles, and shared runner, so it can build a binary package after extraction without network access.
+The command requires Python 3.8 or newer. Binary builds also require CMake 3.22.1 or newer and Ninja. The package runner downloads each package's HTTPS source archive and any declared prerequisite archives, checks their SHA256 values, and extracts the declared top-level directories. `--kind source` creates a source bundle without a compiler or target; the bundle includes the verified package source, recipe, target profiles, and shared runner, so it can build a binary package after extraction without network access.
 
 ```sh
 # Source bundle only; no target or compiler is needed.

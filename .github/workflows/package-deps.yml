@@ -60,6 +60,9 @@ jobs:
 
       - id: inputs
         env:
+          PACKAGE_NAME: ${{ inputs.package }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+          REQUESTED_KIND: ${{ inputs.kind }}
           REQUESTED_TARGET: ${{ inputs.target }}
           REQUESTED_DATE: ${{ inputs.date }}
           REPOSITORY_SHA: ${{ github.sha }}
