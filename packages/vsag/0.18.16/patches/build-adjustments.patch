@@ -403,7 +403,7 @@ index e6c58466..dd4b0233 100644
  
  #else
 diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
-index c86c1baf..125bb88f 100644
+index c86c1baf..c0a31807 100644
 --- a/extern/diskann/DiskANN/src/disk_utils.cpp
 +++ b/extern/diskann/DiskANN/src/disk_utils.cpp
 @@ -25,7 +25,7 @@ namespace diskann
@@ -433,6 +433,24 @@ index c86c1baf..125bb88f 100644
      // write into merged ofstream
      merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
      if (nnbrs > 0)
+@@ -495,7 +495,7 @@ void breakup_dense_points(const std::string data_file, const std::string labels_
+     std::string token, line;
+     std::ifstream labels_stream(labels_file);
+     T *data;
+-    uint64_t npts, ndims;
++    size_t npts, ndims;
+     diskann::load_bin<T>(data_file, data, npts, ndims);
+ 
+     std::unordered_map<uint32_t, uint32_t> dummy_pt_ids;
+@@ -580,7 +580,7 @@ void extract_shard_labels(const std::string &in_label_file, const std::string &s
+     diskann::cout << "Extracting labels for shard" << std::endl;
+ 
+     uint32_t *ids = nullptr;
+-    uint64_t num_ids, tmp_dim;
++    size_t num_ids, tmp_dim;
+     diskann::load_bin(shard_ids_bin, ids, num_ids, tmp_dim);
+ 
+     uint32_t counter = 0, shard_counter = 0;
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
@@ -504,8 +522,30 @@ index 9244715e..ee603359 100644
  #include <math_utils.h>
  // #include <mkl.h>
  #include <cblas.h>
+diff --git a/extern/diskann/DiskANN/src/pq.cpp b/extern/diskann/DiskANN/src/pq.cpp
+index 920abad3..35c29ecf 100644
+--- a/extern/diskann/DiskANN/src/pq.cpp
++++ b/extern/diskann/DiskANN/src/pq.cpp
+@@ -49,7 +49,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ {
+ #endif
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     std::string rotmat_file = std::string(pq_table_file) + "_rotation_matrix.bin";
+ 
+ #ifdef EXEC_ENV_OLS
+@@ -171,7 +171,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ void FixedChunkPQTable::load_pq_centroid_bin(std::stringstream &pq_table, size_t num_chunks)
+ {
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+ 
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pq_table, reinterpret_cast<size_t *&>(file_offset_data), nr, nc);
 diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
-index 0feeb2fe..7fe7c3b9 100644
+index 0feeb2fe..a2af65dc 100644
 --- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
 +++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
 @@ -10,11 +10,7 @@
@@ -520,6 +560,24 @@ index 0feeb2fe..7fe7c3b9 100644
  
  #define READ_U64(stream, val) stream.read((char *)&val, sizeof(uint64_t))
  #define READ_U32(stream, val) stream.read((char *)&val, sizeof(uint32_t))
+@@ -1038,7 +1034,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
+     size_t pq_file_dim, pq_file_num_centroids;
+ 
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
+     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
+@@ -1309,7 +1305,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(std::stringstream &pivots_
+ 
+     size_t pq_file_dim, pq_file_num_centroids;
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
+     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
 --- a/extern/diskann/diskann.cmake
