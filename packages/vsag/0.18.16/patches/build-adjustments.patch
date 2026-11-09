@@ -703,15 +703,16 @@ index 199731c2..79b4aa82 100644
      target_compile_definitions (io PUBLIC -DHAVE_LIBAIO=1)
      target_link_libraries (io PUBLIC fmt::fmt aio coverage_config)
 diff --git a/src/io/buffer_io.cpp b/src/io/buffer_io.cpp
-index 9cd53f41..31512c3c 100644
+index 9cd53f41..b722ee56 100644
 --- a/src/io/buffer_io.cpp
 +++ b/src/io/buffer_io.cpp
-@@ -16,9 +16,16 @@
+@@ -16,9 +16,17 @@
  #include "buffer_io.h"
  
  #include <fcntl.h>
 +#if defined(_WIN32)
 +#include <io.h>
++#include <share.h>
 +#include <sys/stat.h>
 +#else
  #include <unistd.h>
@@ -723,19 +724,29 @@ index 9cd53f41..31512c3c 100644
  
  namespace vsag {
  
-@@ -29,7 +36,11 @@ BufferIO::BufferIO(std::string filename, Allocator* allocator)
+@@ -29,10 +37,21 @@ BufferIO::BufferIO(std::string filename, Allocator* allocator)
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("{} is a directory", this->filepath_));
      }
 +#if defined(_WIN32)
-+    this->fd_ = _open(filepath_.c_str(), _O_CREAT | _O_RDWR | _O_BINARY, _S_IREAD | _S_IWRITE);
++    const int open_error = _sopen_s(&this->fd_, filepath_.c_str(),
++                                    _O_CREAT | _O_RDWR | _O_BINARY,
++                                    _SH_DENYNO, _S_IREAD | _S_IWRITE);
 +#else
      this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
 +#endif
      if (this->fd_ < 0) {
++#if defined(_WIN32)
++        throw VsagException(ErrorType::INTERNAL_ERROR,
++                            fmt::format("open file {} error {}", this->filepath_, open_error));
++#else
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
-@@ -44,7 +55,22 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
++#endif
+     }
+ }
+ 
+@@ -44,7 +63,22 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
  
  void
  BufferIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
@@ -759,7 +770,7 @@ index 9cd53f41..31512c3c 100644
      if (ret != size) {
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("write bytes {} less than {}", ret, size));
-@@ -59,7 +85,22 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
+@@ -59,7 +93,22 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
      if (size == 0) {
          return true;
      }
@@ -823,15 +834,16 @@ index 9f36f7d8..43c7e754 100644
  };
  }  // namespace vsag
 diff --git a/src/io/mmap_io.cpp b/src/io/mmap_io.cpp
-index 1ed8a547..5c6e2b57 100644
+index 1ed8a547..4aa6f7d2 100644
 --- a/src/io/mmap_io.cpp
 +++ b/src/io/mmap_io.cpp
-@@ -16,8 +16,15 @@
+@@ -16,8 +16,16 @@
  #include "mmap_io.h"
  
  #include <fcntl.h>
 +#if defined(_WIN32)
 +#include <io.h>
++#include <share.h>
 +#include <sys/stat.h>
 +#define NOMINMAX
 +#include <windows.h>
@@ -842,7 +854,7 @@ index 1ed8a547..5c6e2b57 100644
  
  #include <filesystem>
  #include <utility>
-@@ -26,6 +33,28 @@
+@@ -26,6 +34,28 @@
  
  namespace vsag {
  
@@ -871,19 +883,26 @@ index 1ed8a547..5c6e2b57 100644
  MMapIO::MMapIO(std::string filename, Allocator* allocator)
      : BasicIO<MMapIO>(allocator), filepath_(std::move(filename)) {
      this->exist_file_ = std::filesystem::exists(this->filepath_);
-@@ -34,7 +63,11 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+@@ -34,21 +64,40 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
                              fmt::format("{} is a directory", this->filepath_));
      }
  
 +#if defined(_WIN32)
-+    this->fd_ = _open(filepath_.c_str(), _O_CREAT | _O_RDWR | _O_BINARY, _S_IREAD | _S_IWRITE);
++    const int open_error = _sopen_s(&this->fd_, filepath_.c_str(),
++                                    _O_CREAT | _O_RDWR | _O_BINARY,
++                                    _SH_DENYNO, _S_IREAD | _S_IWRITE);
 +#else
      this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
 +#endif
      if (this->fd_ < 0) {
++#if defined(_WIN32)
++        throw VsagException(ErrorType::INTERNAL_ERROR,
++                            fmt::format("open file {} error {}", this->filepath_, open_error));
++#else
          throw VsagException(ErrorType::INTERNAL_ERROR,
                              fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
-@@ -42,13 +75,21 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
++#endif
+     }
      auto mmap_size = this->size_;
      if (this->size_ == 0) {
          mmap_size = DEFAULT_INIT_MMAP_SIZE;
@@ -908,7 +927,7 @@ index 1ed8a547..5c6e2b57 100644
  }
  
  MMapIO::MMapIO(const MMapIOParamPtr& io_param, const IndexCommonParam& common_param)
-@@ -58,8 +99,13 @@ MMapIO::MMapIO(const IOParamPtr& param, const IndexCommonParam& common_param)
+@@ -58,8 +107,13 @@ MMapIO::MMapIO(const IOParamPtr& param, const IndexCommonParam& common_param)
      : MMapIO(std::dynamic_pointer_cast<MMapIOParameter>(param), common_param){};
  
  MMapIO::~MMapIO() {
@@ -922,7 +941,7 @@ index 1ed8a547..5c6e2b57 100644
      // remove file
      if (not this->exist_file_) {
          std::filesystem::remove(this->filepath_);
-@@ -74,12 +120,28 @@ MMapIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+@@ -74,12 +128,28 @@ MMapIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
          old_size = DEFAULT_INIT_MMAP_SIZE;
      }
      if (new_size > old_size) {
@@ -954,7 +973,7 @@ index 1ed8a547..5c6e2b57 100644
      }
      this->size_ = std::max(this->size_, new_size);
      memcpy(this->start_ + offset, data, size);
-@@ -115,4 +177,4 @@ MMapIO::MultiReadImpl(uint8_t* datas, uint64_t* sizes, uint64_t* offsets, uint64
+@@ -115,4 +185,4 @@ MMapIO::MultiReadImpl(uint8_t* datas, uint64_t* sizes, uint64_t* offsets, uint64
      return ret;
  }
  
