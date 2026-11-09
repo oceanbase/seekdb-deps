@@ -35,3 +35,18 @@ index 5581113..fa401de 100644
    get_filename_component(SRC_DIR ${SRC} DIRECTORY)
    # Generate a git-describe version string from Git repository tags
    execute_process(
+diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
+--- a/extern/openblas/openblas.cmake
++++ b/extern/openblas/openblas.cmake
+@@ -6,9 +6,6 @@
+ ExternalProject_Add(
+     ${name}
+-    URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.23/OpenBLAS-0.3.23.tar.gz
+-        # this url is maintained by the vsag project, if it's broken, please try
+-        #  the latest commit or contact the vsag project
+-        http://vsagcache.oss-rg-china-mainland.aliyuncs.com/openblas/OpenBLAS-0.3.23.tar.gz
+-    URL_HASH MD5=115634b39007de71eb7e75cf7591dfb2
++    URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
++    URL_HASH SHA256=5d9491d07168a5d00116cdc068a40022c3455bf9293c7cb86a65b1054d7e5114
+     DOWNLOAD_NAME OpenBLAS-v0.3.23.tar.gz
+     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
