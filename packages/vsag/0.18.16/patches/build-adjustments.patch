@@ -457,6 +457,22 @@ index 9244715e..ee603359 100644
  #include <math_utils.h>
  // #include <mkl.h>
  #include <cblas.h>
+diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+index 0feeb2fe..7fe7c3b9 100644
+--- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
++++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+@@ -10,11 +10,7 @@
+ #include "pq_flash_index.h"
+ #include "cosine_similarity.h"
+ 
+-#ifdef _WINDOWS
+-#include "windows_aligned_file_reader.h"
+-#else
+ #include "local_file_reader.h"
+-#endif
+ 
+ #define READ_U64(stream, val) stream.read((char *)&val, sizeof(uint64_t))
+ #define READ_U32(stream, val) stream.read((char *)&val, sizeof(uint32_t))
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
 --- a/extern/diskann/diskann.cmake
