@@ -123,7 +123,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check cmake ninja
 
       - name: Select macOS VSAG OpenMP compiler
-        if: ${{ matrix.target.family == 'macos' && inputs.package == 'vsag' && inputs.version == '0.18.0' }}
+        if: ${{ matrix.target.family == 'macos' && inputs.package == 'vsag' && inputs.version == '0.18.16' }}
         shell: bash
         run: |
           brew install llvm libomp
@@ -132,7 +132,7 @@ jobs:
           echo "CXX=$llvm_prefix/bin/clang++" >> "$GITHUB_ENV"
 
       - name: Select Windows VSAG Clang compiler
-        if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && inputs.version == '0.18.0' }}
+        if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && inputs.version == '0.18.16' }}
         shell: pwsh
         run: |
           $compiler = (Get-Command clang-cl.exe -ErrorAction Stop).Source

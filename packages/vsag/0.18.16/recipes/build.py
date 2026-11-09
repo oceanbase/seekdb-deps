@@ -66,11 +66,6 @@ def _compiler_library(ctx, compiler, name):
 
 def build(ctx):
     if ctx.target.family == "linux":
-        fc = ctx.environment.get("FC", "gfortran")
-        if not shutil.which(fc, path=ctx.environment.get("PATH")):
-            raise ValueError("VSAG build needs a Fortran compiler for OpenBLAS: " + fc)
-        ctx.environment["FC"] = fc
-
         libaio_header = Path("/usr/include/libaio.h")
         if not libaio_header.is_file():
             raise ValueError("VSAG build needs the libaio development header")
@@ -126,11 +121,8 @@ def build(ctx):
         )
     if ctx.target.family == "linux":
         compiler_libraries = {
-            "libgfortran_static.a": (fc, "libgfortran.a"),
             "libgomp_static.a": (ctx.environment["CXX"], "libgomp.a"),
         }
-        if ctx.target.architecture == "x86_64":
-            compiler_libraries["libquadmath_static.a"] = (fc, "libquadmath.a")
         runtime_dir = ctx.build_dir / "runtime"
         runtime_dir.mkdir()
         for destination, (compiler, name) in compiler_libraries.items():

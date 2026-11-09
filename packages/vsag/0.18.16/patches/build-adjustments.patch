@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a8f90103..c1693a41 100644
+index 8846f0ad..32ca2096 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -86,14 +86,22 @@ else ()
@@ -88,7 +88,7 @@ index a8f90103..c1693a41 100644
  
  set (common_configure_envs
          "env"
-@@ -230,7 +251,9 @@ include (extern/openblas/openblas.cmake)
+@@ -231,7 +252,9 @@ include (extern/openblas/openblas.cmake)
  include (extern/mkl/mkl.cmake)
  include (extern/diskann/diskann.cmake)
  include (extern/spdlog/spdlog.cmake)
@@ -99,7 +99,7 @@ index a8f90103..c1693a41 100644
  include (extern/cpuinfo/cpuinfo.cmake)
  include (extern/fmt/fmt.cmake)
  include (extern/thread_pool/thread_pool.cmake)
-@@ -254,18 +277,24 @@ set (CMAKE_CXX_STANDARD 17)
+@@ -255,18 +278,24 @@ set (CMAKE_CXX_STANDARD 17)
  set (CMAKE_CXX_STANDARD_REQUIRED ON)
  
  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -129,7 +129,7 @@ index a8f90103..c1693a41 100644
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
  
-@@ -319,7 +348,9 @@ endif ()
+@@ -320,7 +349,9 @@ endif ()
  
  # sources
  add_subdirectory (src)
@@ -140,12 +140,12 @@ index a8f90103..c1693a41 100644
  if (ENABLE_EXAMPLES)
      add_subdirectory (examples/cpp)
  endif ()
-@@ -374,9 +405,10 @@ endif ()
+@@ -375,9 +406,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
 -        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
-+        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.0 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
++        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.16 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
          -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
          -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
@@ -153,7 +153,7 @@ index a8f90103..c1693a41 100644
  add_dependencies (vsag version)
 +add_dependencies (vsag_static version)
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
-index 95e07446..f198b387 100644
+index b0571140..1fc3415f 100644
 --- a/extern/antlr4/antlr4.cmake
 +++ b/extern/antlr4/antlr4.cmake
 @@ -11,6 +11,10 @@ else ()
@@ -165,9 +165,9 @@ index 95e07446..f198b387 100644
 +    set (FULL_CXX_FLAGS "${FULL_CXX_FLAGS} /FIchrono")
 +endif ()
  
- ExternalProject_Add(
-         ${name}
-@@ -28,7 +32,7 @@ ExternalProject_Add(
+ set(antlr4_urls
+     https://github.com/antlr/antlr4/archive/refs/tags/4.13.2.tar.gz
+@@ -30,7 +34,7 @@ ExternalProject_Add(
          BINARY_DIR ${binary_dir}
          BUILD_IN_SOURCE 0
          CONFIGURE_COMMAND
@@ -176,7 +176,7 @@ index 95e07446..f198b387 100644
          BUILD_COMMAND
          cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
          INSTALL_COMMAND cmake --install build
-@@ -48,7 +52,7 @@ include_directories(extern/antlr4/fc)
+@@ -50,7 +54,7 @@ include_directories(extern/antlr4/fc)
  file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
  add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
  add_dependencies(antlr4-autogen antlr4)
@@ -186,10 +186,10 @@ index 95e07446..f198b387 100644
  target_link_libraries(antlr4-autogen antlr4-runtime)
  
 diff --git a/extern/boost/boost.cmake b/extern/boost/boost.cmake
-index 61ba4d3b..b2ca9ebb 100644
+index f064f7d4..d4f975c6 100644
 --- a/extern/boost/boost.cmake
 +++ b/extern/boost/boost.cmake
-@@ -1,17 +1,11 @@
+@@ -1,12 +1,8 @@
 -# Copyright (c) 2022 Ant Group. All rights reserved.
 -
 -cmake_policy(SET CMP0114 NEW)
@@ -200,16 +200,11 @@ index 61ba4d3b..b2ca9ebb 100644
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
  set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
 -get_filename_component(compiler_path ${CMAKE_CXX_COMPILER} DIRECTORY)
- ExternalProject_Add(
-     ${name}
-     URL https://archives.boost.io/release/1.67.0/source/boost_1_67_0.tar.gz
--        # this url is maintained by the vsag project, if it's broken, please try
--        #  the latest commit or contact the vsag project
--        http://vsagcache.oss-rg-china-mainland.aliyuncs.com/boost/boost_1_67_0.tar.gz
-     URL_HASH SHA256=8aa4e330c870ef50a896634c931adf468b21f8a69b77007e45c444151229f665
-     DOWNLOAD_NAME boost_1_67_0.tar.gz
-     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
-@@ -20,53 +14,9 @@ ExternalProject_Add(
+-
+ set(boost_urls
+     https://archives.boost.io/release/1.67.0/source/boost_1_67_0.tar.gz
+ )
+@@ -23,52 +19,9 @@ ExternalProject_Add(
      DOWNLOAD_DIR ${DOWNLOAD_DIR}
      SOURCE_DIR ${source_dir}
      CONFIGURE_COMMAND ""
@@ -265,7 +260,6 @@ index 61ba4d3b..b2ca9ebb 100644
 -)
 -
 -ExternalProject_Add_StepTargets(${name} clean)
--
 diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
 index 22fa9f69..bc882259 100644
 --- a/extern/diskann/DiskANN/include/utils.h
@@ -310,14 +304,14 @@ index c1ed55f8..25bd4c85 100644
  add_dependencies(diskann boost openblas)
  
 diff --git a/extern/mkl/mkl.cmake b/extern/mkl/mkl.cmake
-index a1b4e953..b23a5b6b 100644
+index 0a81bbea..53d3dae4 100644
 --- a/extern/mkl/mkl.cmake
 +++ b/extern/mkl/mkl.cmake
-@@ -137,12 +137,18 @@ else()
+@@ -135,12 +135,18 @@ else()
          message(WARNING "Intel MKL is not supported on this architecture (${CMAKE_HOST_SYSTEM_PROCESSOR}). Falling back to OpenBLAS.")
      endif()
  
--    set(BLAS_LIBRARIES libopenblas.a gfortran)
+-    set(BLAS_LIBRARIES libopenblas.a)
 -    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 -        list(PREPEND BLAS_LIBRARIES omp)
 -    else()
@@ -328,7 +322,7 @@ index a1b4e953..b23a5b6b 100644
 +    elseif (APPLE OR ANDROID)
 +        set(BLAS_LIBRARIES ${CMAKE_BINARY_DIR}/openblas/install/lib/libopenblas.a)
 +    else ()
-+        set(BLAS_LIBRARIES libopenblas.a gfortran)
++        set(BLAS_LIBRARIES libopenblas.a)
 +        if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 +            list(PREPEND BLAS_LIBRARIES omp)
 +        else()
@@ -339,56 +333,25 @@ index a1b4e953..b23a5b6b 100644
  endif()
  
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed4..5a3b909b 100644
+index 23b43395..3a74d477 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -1,59 +1,85 @@
+@@ -1,9 +1,9 @@
 -
  set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
  set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
  
+ set(openblas_urls
++    https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.34
+     https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz
+     https://sourceforge.net/projects/openblas/files/v0.3.34/OpenBLAS-0.3.34.tar.gz/download
+ )
+@@ -24,7 +24,60 @@ foreach(entry IN LISTS common_configure_envs)
+     list(APPEND openblas_configure_envs "${entry}")
+ endforeach()
+ 
 -ExternalProject_Add(
--    ${name}
--    URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.23/OpenBLAS-0.3.23.tar.gz
--        # this url is maintained by the vsag project, if it's broken, please try
--        #  the latest commit or contact the vsag project
--        http://vsagcache.oss-rg-china-mainland.aliyuncs.com/openblas/OpenBLAS-0.3.23.tar.gz
--    URL_HASH MD5=115634b39007de71eb7e75cf7591dfb2
--    DOWNLOAD_NAME OpenBLAS-v0.3.23.tar.gz
--    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
--    TMP_DIR ${BUILD_INFO_DIR}
--    STAMP_DIR ${BUILD_INFO_DIR}
--    DOWNLOAD_DIR ${DOWNLOAD_DIR}
--    SOURCE_DIR ${source_dir}
--    CONFIGURE_COMMAND ""
--    BUILD_COMMAND
--        ${common_configure_envs}
--        OMP_NUM_THREADS=1
--        PATH=/usr/lib/ccache:$ENV{PATH}
--        LD_LIBRARY_PATH=/opt/alibaba-cloud-compiler/lib64/:$ENV{LD_LIBRARY_PATH}
--        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 -j${NUM_BUILDING_JOBS}
--    INSTALL_COMMAND
--        make DYNAMIC_ARCH=1 PREFIX=${install_dir} install
--    BUILD_IN_SOURCE 1
--    LOG_CONFIGURE TRUE
--    LOG_BUILD TRUE
--    LOG_INSTALL TRUE
--    DOWNLOAD_NO_PROGRESS 1
--    INACTIVITY_TIMEOUT 5
--    TIMEOUT 30
--)
--
--include_directories(${install_dir}/include)
--link_directories (${install_dir}/lib)
--link_directories (${install_dir}/lib64)
--
--file(GLOB LIB_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib)
--if(LIB_DIR_EXIST)
--    file(GLOB LIB_FILES ${install_dir}/lib/lib*.a)
--    foreach(lib_file ${LIB_FILES})
--        install(FILES ${lib_file}
--                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
 +if (WIN32 OR APPLE OR ANDROID)
 +    # The upstream Make recipe assumes a GNU host toolchain. Its CMake build
 +    # supports MSVC and propagates the Android and macOS target settings.
@@ -403,9 +366,9 @@ index 3db31ed4..5a3b909b 100644
 +    endif ()
 +    ExternalProject_Add(
 +        ${name}
-+        URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
-+        URL_HASH SHA256=5d9491d07168a5d00116cdc068a40022c3455bf9293c7cb86a65b1054d7e5114
-+        DOWNLOAD_NAME OpenBLAS-v0.3.23.tar.gz
++        URL ${openblas_urls}
++        URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
++        DOWNLOAD_NAME OpenBLAS-v0.3.34.tar.gz
 +        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
 +        SOURCE_DIR ${source_dir}
 +        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${name}/build
@@ -433,48 +396,62 @@ index 3db31ed4..5a3b909b 100644
 +        LOG_CONFIGURE TRUE
 +        LOG_BUILD TRUE
 +        LOG_INSTALL TRUE
++        LOG_OUTPUT_ON_FAILURE TRUE
 +        DOWNLOAD_NO_PROGRESS 1
 +        INACTIVITY_TIMEOUT 5
 +        TIMEOUT 90
++    )
++else ()
++    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
++        set(openblas_make_target TARGET=CORE2)
++    endif ()
++    ExternalProject_Add(
+     ${name}
+     URL ${openblas_urls}
+     URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
+@@ -40,10 +93,10 @@ ExternalProject_Add(
+         OMP_NUM_THREADS=1
+         PATH=/usr/lib/ccache:$ENV{PATH}
+         LD_LIBRARY_PATH=/opt/alibaba-cloud-compiler/lib64/:$ENV{LD_LIBRARY_PATH}
+-        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 NOFORTRAN=1
++        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 NOFORTRAN=1 ${openblas_make_target}
+              MAKE_NB_JOBS=${NUM_BUILDING_JOBS} -j${NUM_BUILDING_JOBS}
+     INSTALL_COMMAND
+-        make DYNAMIC_ARCH=1 NOFORTRAN=1 PREFIX=${install_dir} install
++        make DYNAMIC_ARCH=1 NOFORTRAN=1 ${openblas_make_target} PREFIX=${install_dir} install
+     BUILD_BYPRODUCTS ${install_dir}/lib/libopenblas.a
+     BUILD_IN_SOURCE 1
+     LOG_CONFIGURE TRUE
+@@ -53,28 +106,12 @@ ExternalProject_Add(
+     DOWNLOAD_NO_PROGRESS 1
+     INACTIVITY_TIMEOUT 5
+     TIMEOUT 30
+-)
+-
+-include_directories(${install_dir}/include)
+-link_directories (${install_dir}/lib)
+-link_directories (${install_dir}/lib64)
+-
+-file(GLOB LIB_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib)
+-if(LIB_DIR_EXIST)
+-    file(GLOB LIB_FILES ${install_dir}/lib/lib*.a)
+-    foreach(lib_file ${LIB_FILES})
+-        install(FILES ${lib_file}
+-                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
      )
 -    endforeach()
 -endif()
--
++endif ()
+ 
 -file(GLOB LIB64_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib64)
 -if(LIB64_DIR_EXIST)
 -    file(GLOB LIB64_FILES ${install_dir}/lib64/lib*.a)
 -    foreach(lib64_file ${LIB64_FILES})
 -        install(FILES ${lib64_file}
 -                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-+else ()
-+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-+        set(openblas_make_target TARGET=CORE2)
-+    endif ()
-+    ExternalProject_Add(
-+        ${name}
-+        URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
-+        URL_HASH SHA256=5d9491d07168a5d00116cdc068a40022c3455bf9293c7cb86a65b1054d7e5114
-+        DOWNLOAD_NAME OpenBLAS-v0.3.23.tar.gz
-+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
-+        TMP_DIR ${BUILD_INFO_DIR}
-+        STAMP_DIR ${BUILD_INFO_DIR}
-+        DOWNLOAD_DIR ${DOWNLOAD_DIR}
-+        SOURCE_DIR ${source_dir}
-+        CONFIGURE_COMMAND ""
-+        BUILD_COMMAND ${common_configure_envs} OMP_NUM_THREADS=1 make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 ${openblas_make_target} -j${NUM_BUILDING_JOBS}
-+        INSTALL_COMMAND make DYNAMIC_ARCH=1 ${openblas_make_target} PREFIX=${install_dir} install
-+        BUILD_IN_SOURCE 1
-+        LOG_CONFIGURE TRUE
-+        LOG_BUILD TRUE
-+        LOG_INSTALL TRUE
-+        DOWNLOAD_NO_PROGRESS 1
-+        INACTIVITY_TIMEOUT 5
-+        TIMEOUT 30
-     )
+-    )
 -    endforeach()
 -endif()
-+endif ()
-+
 +include_directories(${install_dir}/include)
 +if (WIN32 OR APPLE OR ANDROID)
 +    # OpenBLAS CMake installs cblas.h under include/openblas.
@@ -482,10 +459,10 @@ index 3db31ed4..5a3b909b 100644
 +endif ()
 +link_directories(${install_dir}/lib)
 diff --git a/extern/roaringbitmap/roaringbitmap.cmake b/extern/roaringbitmap/roaringbitmap.cmake
-index 8a1729c2..48d70ef0 100644
+index 4b87cf05..21da6409 100644
 --- a/extern/roaringbitmap/roaringbitmap.cmake
 +++ b/extern/roaringbitmap/roaringbitmap.cmake
-@@ -28,5 +28,7 @@ FetchContent_GetProperties(roaringbitmap)
+@@ -29,5 +29,7 @@ FetchContent_GetProperties(roaringbitmap)
  if(NOT roaringbitmap_POPULATED)
    FetchContent_Populate(roaringbitmap)
    add_subdirectory(${roaringbitmap_SOURCE_DIR} ${roaringbitmap_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -495,10 +472,10 @@ index 8a1729c2..48d70ef0 100644
 +  endif ()
  endif()
 diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
-index 371900a0..bcbaf7dc 100644
+index 8e5dce8d..b2ed2304 100644
 --- a/extern/spdlog/spdlog.cmake
 +++ b/extern/spdlog/spdlog.cmake
-@@ -16,7 +16,7 @@ ExternalProject_Add(
+@@ -13,7 +13,7 @@ ExternalProject_Add(
      DOWNLOAD_DIR ${DOWNLOAD_DIR}
      SOURCE_DIR ${source_dir}
      CONFIGURE_COMMAND
@@ -818,7 +795,7 @@ index 15ae4ee7..1e021066 100644
      this->code_size_ = 0;
  
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
-index 10075a1c..92f5b507 100644
+index 10075a1c..0ca45017 100644
 --- a/src/simd/CMakeLists.txt
 +++ b/src/simd/CMakeLists.txt
 @@ -43,7 +43,7 @@ if (DIST_CONTAINS_SSE)
@@ -830,6 +807,24 @@ index 10075a1c..92f5b507 100644
  endif ()
  if (DIST_CONTAINS_AVX)
      set_source_files_properties (avx.cpp PROPERTIES COMPILE_FLAGS "-mavx -mf16c")
+@@ -56,7 +56,7 @@ if (DIST_CONTAINS_AVX512)
+             avx512.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
+     )
+ endif ()
+ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+@@ -64,7 +64,7 @@ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+             avx512vpopcntdq.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
+     )
+ endif ()
+ if (DIST_CONTAINS_NEON)
 @@ -75,6 +75,7 @@ if (DIST_CONTAINS_SVE)
  endif ()
  

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "vsag",
-  "version": "0.18.0",
+  "version": "0.18.16",
   "supported_targets": [
     "linux-x86_64-glibc217",
     "linux-aarch64-glibc217",
@@ -11,18 +11,19 @@
   ],
   "build_dependencies": {
     "linux": {
-      "compilers": ["fortran"],
-      "system_packages": ["libaio-dev"]
+      "system_packages": [
+        "libaio-dev"
+      ]
     }
   },
   "source": {
     "path": "source",
-    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.18.0",
+    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.18.16",
     "repository": "https://github.com/antgroup/vsag.git",
-    "tag": "v0.18.0",
-    "revision": "9f7dca17dbb0cce2344f2ecef9e114b2c2ced523",
-    "archive_sha256": "fd15c30e78d972397e900a349f3144a9c513e8ad79d894a6003434e22138ecbd",
-    "strip_prefix": "vsag-0.18.0"
+    "tag": "v0.18.16",
+    "revision": "3fc9177b9bc471e939a46e1f52ecd22591487fcd",
+    "archive_sha256": "ab76a82aafb67b804dc4446c9d46962a3f6eada15a069576a476cb8334ecf1cc",
+    "strip_prefix": "vsag-0.18.16"
   },
   "recipe": "recipes/build.py",
   "patches": [
@@ -43,7 +44,6 @@
       "lib/libantlr4-runtime.a",
       "lib/libantlr4-autogen.a",
       "lib/libfmt.a",
-      "lib/libgfortran_static.a",
       "lib/libgomp_static.a"
     ],
     "macos": [
