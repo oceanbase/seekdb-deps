@@ -289,7 +289,7 @@ index 0b17807d..3ee06dd3 100644
      LL_Info = 0,
      LL_Error,
 diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
-index 22fa9f69..bc882259 100644
+index 22fa9f69..d4f8d51d 100644
 --- a/extern/diskann/DiskANN/include/utils.h
 +++ b/extern/diskann/DiskANN/include/utils.h
 @@ -4,6 +4,7 @@
@@ -300,7 +300,16 @@ index 22fa9f69..bc882259 100644
  
  #if defined(__i386__) || defined(__x86_64__)
  #include <xmmintrin.h>
-@@ -240,7 +241,12 @@ inline void alloc_aligned(void **ptr, size_t size, size_t align)
+@@ -113,6 +114,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
+ #endif
+@@ -240,7 +243,12 @@ inline void alloc_aligned(void **ptr, size_t size, size_t align)
      if (IS_ALIGNED(size, align) == 0)
          report_misalignment_of_requested_size(align);
  #ifndef _WINDOWS
@@ -312,6 +321,15 @@ index 22fa9f69..bc882259 100644
 +#endif
  #else
      *ptr = ::_aligned_malloc(size, align); // note the swapped arguments!
+ #endif
+@@ -710,6 +718,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
  #endif
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
@@ -566,6 +584,72 @@ index d21476be..cf7e2696 100644
  
      /**
       * @brief Constructs a new object of type T.
+diff --git a/src/algorithm/hnswlib/hnswalg.cpp b/src/algorithm/hnswlib/hnswalg.cpp
+index 5950e592..38b062d9 100644
+--- a/src/algorithm/hnswlib/hnswalg.cpp
++++ b/src/algorithm/hnswlib/hnswalg.cpp
+@@ -1683,7 +1683,7 @@ HierarchicalNSW::addPoint(const void* data_point, LabelType label, int level) {
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchKnn(const void* query_data,
+                            size_t k,
+-                           uint64_t ef,
++                           size_t ef,
+                            const vsag::FilterPtr is_id_allowed,
+                            const float skip_ratio,
+                            vsag::FilterSearchSkipStrategyType skip_strategy_type,
+@@ -1808,7 +1808,7 @@ HierarchicalNSW::searchKnn(const void* query_data,
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchRange(const void* query_data,
+                              float radius,
+-                             uint64_t ef,
++                             size_t ef,
+                              const vsag::FilterPtr is_id_allowed) const {
+     std::shared_lock resize_lock(resize_mutex_);
+     std::priority_queue<std::pair<float, LabelType>> result;
+diff --git a/src/algorithm/hnswlib/hnswalg.h b/src/algorithm/hnswlib/hnswalg.h
+index 1d891e08..64d61aaa 100644
+--- a/src/algorithm/hnswlib/hnswalg.h
++++ b/src/algorithm/hnswlib/hnswalg.h
+@@ -465,7 +465,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::FilterSearchSkipStrategyType skip_strategy_type =
+@@ -478,7 +478,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override;
+ 
+     void
+diff --git a/src/algorithm/hnswlib/hnswalg_static.h b/src/algorithm/hnswlib/hnswalg_static.h
+index 1889fb27..255936ea 100644
+--- a/src/algorithm/hnswlib/hnswalg_static.h
++++ b/src/algorithm/hnswlib/hnswalg_static.h
+@@ -1406,7 +1406,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::FilterSearchSkipStrategyType skip_strategy_type =
+@@ -1489,7 +1489,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override {
+         std::runtime_error("static hnsw does not support range search");
+         //        std::priority_queue<std::pair<float, LabelType>> result;
 diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
 index 09a119b5..0b6fe127 100644
 --- a/src/impl/allocator/default_allocator.cpp
