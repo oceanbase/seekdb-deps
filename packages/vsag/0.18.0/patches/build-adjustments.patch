@@ -330,10 +330,10 @@ index a1b4e953..b23a5b6b 100644
  endif()
  
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed4..acc7b527 100644
+index 3db31ed4..6814b4b7 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -1,59 +1,76 @@
+@@ -1,59 +1,82 @@
 -
  set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
@@ -387,6 +387,11 @@ index 3db31ed4..acc7b527 100644
 +    if (WIN32)
 +        set(openblas_target CORE2)
 +    endif ()
++    set(openblas_c_flags "${CMAKE_C_FLAGS}")
++    if (APPLE OR ANDROID)
++        # The bundled C LAPACK translation has legacy pointer-type warnings.
++        string(APPEND openblas_c_flags " -Wno-error=incompatible-pointer-types")
++    endif ()
 +    ExternalProject_Add(
 +        ${name}
 +        URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
@@ -396,6 +401,7 @@ index 3db31ed4..acc7b527 100644
 +        SOURCE_DIR ${source_dir}
 +        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${name}/build
 +        CMAKE_ARGS ${common_cmake_args}
++            "-DCMAKE_C_FLAGS=${openblas_c_flags}"
 +            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 +            -DCMAKE_INSTALL_PREFIX=${install_dir}
 +            -DCMAKE_INSTALL_LIBDIR=lib
