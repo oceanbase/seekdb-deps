@@ -302,17 +302,27 @@ index 0b17807d..3ee06dd3 100644
      LL_Info = 0,
      LL_Error,
 diff --git a/extern/diskann/DiskANN/include/local_file_reader.h b/extern/diskann/DiskANN/include/local_file_reader.h
-index e0f77942..c93a6058 100644
+index e0f77942..c85afd2e 100644
 --- a/extern/diskann/DiskANN/include/local_file_reader.h
 +++ b/extern/diskann/DiskANN/include/local_file_reader.h
-@@ -3,7 +3,6 @@
+@@ -1,9 +1,6 @@
  
- #ifndef _WINDOWS
+ #pragma once
  
+-#ifndef _WINDOWS
+-
 -#include <malloc.h>
  #include <cstdio>
  #include <mutex>
  #include <thread>
+@@ -49,7 +46,3 @@ public:
+     // NOTE :: blocking call
+     void read(std::vector<AlignedRead> &read_reqs, bool async = false, CallBack callBack = nullptr);
+ };
+-
+-
+-
+-#endif
 diff --git a/extern/diskann/DiskANN/include/locking.h b/extern/diskann/DiskANN/include/locking.h
 index 2a70f4ff..9ad81795 100644
 --- a/extern/diskann/DiskANN/include/locking.h
@@ -377,7 +387,7 @@ index 22fa9f69..d4f8d51d 100644
          auto ret = std::string(strerror_r(errno, buff, 1024));
  #endif
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
-index 707bb054..d3f4ff0a 100644
+index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
 +++ b/extern/diskann/DiskANN/src/distance.cpp
 @@ -84,7 +84,7 @@ template <typename T> size_t Distance<T>::get_required_alignment() const
@@ -398,6 +408,43 @@ index 707bb054..d3f4ff0a 100644
      return diskann::CosineSimilarity2<float>(a, b, length);
  #else
      float magA = 0, magB = 0, scalarProduct = 0;
+@@ -247,7 +247,7 @@ template <typename T> float SlowDistanceL2<T>::compare(const T *a, const T *b, u
+     return result;
+ }
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+     __m128 r = _mm_setzero_ps();
+@@ -304,6 +304,27 @@ float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t lengt
+ 
+     return sum.m128_f32[0] + sum.m128_f32[1] + sum.m128_f32[2] + sum.m128_f32[3];
+ }
++#elif defined(_WINDOWS)
++float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = static_cast<float>(a[i]) - static_cast<float>(b[i]);
++        result += difference * difference;
++    }
++    return result;
++}
++float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = a[i] - b[i];
++        result += difference * difference;
++    }
++    return result;
++}
+ #else
+ float AVXDistanceL2Int8::compare(const int8_t *, const int8_t *, uint32_t) const
+ {
 diff --git a/extern/diskann/DiskANN/src/math_utils.cpp b/extern/diskann/DiskANN/src/math_utils.cpp
 index 9244715e..ee603359 100644
 --- a/extern/diskann/DiskANN/src/math_utils.cpp
