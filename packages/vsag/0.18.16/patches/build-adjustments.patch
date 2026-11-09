@@ -485,10 +485,22 @@ index 4b87cf05..21da6409 100644
 +  endif ()
  endif()
 diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
-index 8e5dce8d..b2ed2304 100644
+index 8e5dce8d..01052777 100644
 --- a/extern/spdlog/spdlog.cmake
 +++ b/extern/spdlog/spdlog.cmake
-@@ -13,7 +13,7 @@ ExternalProject_Add(
+@@ -4,16 +4,16 @@ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
+ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+ ExternalProject_Add(
+     ${name}
+-    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.12.0.tar.gz
+-    URL_HASH MD5=6b4446526264c1d1276105482adc18d1
+-    DOWNLOAD_NAME spdlog-1.12.0.tar.gz
++    URL https://codeload.github.com/gabime/spdlog/tar.gz/refs/tags/v1.15.3
++    URL_HASH SHA256=15a04e69c222eb6c01094b5c7ff8a249b36bb22788d72519646fb85feb267e67
++    DOWNLOAD_NAME spdlog-1.15.3.tar.gz
+     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
+     TMP_DIR ${BUILD_INFO_DIR}
+     STAMP_DIR ${BUILD_INFO_DIR}
      DOWNLOAD_DIR ${DOWNLOAD_DIR}
      SOURCE_DIR ${source_dir}
      CONFIGURE_COMMAND
