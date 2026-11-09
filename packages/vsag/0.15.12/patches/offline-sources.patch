@@ -22,8 +22,18 @@ index 7ca61cb..789d8d3 100644
          -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
          -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+index 5581113..fa401de 100644
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -1,4 +1,4 @@
+-if(GIT_EXECUTABLE)
++if(GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component(SRC_DIR ${SRC} DIRECTORY)
+   # Generate a git-describe version string from Git repository tags
+   execute_process(
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
-index 06b1c07..60dd4c9 100644
+index 06b1c07..a9e06eb 100644
 --- a/extern/antlr4/antlr4.cmake
 +++ b/extern/antlr4/antlr4.cmake
 @@ -14,11 +14,7 @@ set (FULL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VSAG_ANTLR4_CXX11_ABI}")
@@ -40,7 +50,7 @@ index 06b1c07..60dd4c9 100644
          PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
          TMP_DIR ${BUILD_INFO_DIR}
 diff --git a/extern/boost/boost.cmake b/extern/boost/boost.cmake
-index 61ba4d3..80d6d9c 100644
+index 61ba4d3..86e8c3e 100644
 --- a/extern/boost/boost.cmake
 +++ b/extern/boost/boost.cmake
 @@ -8,11 +8,7 @@ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
@@ -57,7 +67,7 @@ index 61ba4d3..80d6d9c 100644
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
      TMP_DIR ${BUILD_INFO_DIR}
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed..e0cc83a 100644
+index 3db31ed..b20fd47 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
 @@ -5,11 +5,7 @@ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
@@ -74,7 +84,7 @@ index 3db31ed..e0cc83a 100644
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
      TMP_DIR ${BUILD_INFO_DIR}
 diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
-index 371900a..bb62b50 100644
+index 371900a..eefeef6 100644
 --- a/extern/spdlog/spdlog.cmake
 +++ b/extern/spdlog/spdlog.cmake
 @@ -4,11 +4,7 @@ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
