@@ -297,8 +297,8 @@ def apply_patches(package_root, metadata, source_dir, workspace):
         try:
             for patch in patches:
                 patch_path = package_root / patch["path"]
-                run(["git", "apply", "--check", str(patch_path)], cwd=prepared)
-                run(["git", "apply", "--binary", str(patch_path)], cwd=prepared)
+                run(["git", "-c", "core.autocrlf=false", "apply", "--check", str(patch_path)], cwd=prepared)
+                run(["git", "-c", "core.autocrlf=false", "apply", "--binary", str(patch_path)], cwd=prepared)
         finally:
             shutil.rmtree(str(prepared / ".git"))
     return prepared, patches
