@@ -720,6 +720,19 @@ index 1ed8a547..04ed5460 100644
 -}  // namespace vsag
 \ No newline at end of file
 +}  // namespace vsag
+diff --git a/src/quantization/quantizer_adapter.cpp b/src/quantization/quantizer_adapter.cpp
+index 5043c545..722e8f30 100644
+--- a/src/quantization/quantizer_adapter.cpp
++++ b/src/quantization/quantizer_adapter.cpp
+@@ -36,7 +36,7 @@ QuantizerAdapter<QuantT, DataT>::QuantizerAdapter(const QuantizerParamPtr& param
+ 
+ template <typename QuantT, typename DataT>
+ bool
+-QuantizerAdapter<QuantT, DataT>::TrainImpl(const DataType* data, size_t count) {
++QuantizerAdapter<QuantT, DataT>::TrainImpl(const DataType* data, uint64_t count) {
+     if constexpr (std::is_same_v<DataT, int8_t>) {
+         const auto* data_int8 = reinterpret_cast<const int8_t*>(data);
+         Vector<DataType> vec(this->dim_ * count, this->allocator_);
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 10075a1c..92f5b507 100644
 --- a/src/simd/CMakeLists.txt
