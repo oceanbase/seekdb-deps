@@ -386,6 +386,22 @@ index 22fa9f69..d4f8d51d 100644
  #else
          auto ret = std::string(strerror_r(errno, buff, 1024));
  #endif
+diff --git a/extern/diskann/DiskANN/include/windows_customizations.h b/extern/diskann/DiskANN/include/windows_customizations.h
+index e6c58466..dd4b0233 100644
+--- a/extern/diskann/DiskANN/include/windows_customizations.h
++++ b/extern/diskann/DiskANN/include/windows_customizations.h
+@@ -7,8 +7,10 @@
+ 
+ #ifdef _WINDLL
+ #define DISKANN_DLLEXPORT __declspec(dllexport)
+-#else
++#elif defined(DISKANN_USE_DLL)
+ #define DISKANN_DLLEXPORT __declspec(dllimport)
++#else
++#define DISKANN_DLLEXPORT
+ #endif
+ 
+ #else
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
