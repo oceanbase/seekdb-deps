@@ -275,6 +275,19 @@ index f064f7d4..d4f975c6 100644
 -)
 -
 -ExternalProject_Add_StepTargets(${name} clean)
+diff --git a/extern/diskann/DiskANN/include/cosine_similarity.h b/extern/diskann/DiskANN/include/cosine_similarity.h
+index 918a992e..7ec9e6b6 100644
+--- a/extern/diskann/DiskANN/include/cosine_similarity.h
++++ b/extern/diskann/DiskANN/include/cosine_similarity.h
+@@ -23,7 +23,7 @@
+ 
+ extern bool Avx2SupportedCPU;
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ // SIMD implementation of Cosine similarity. Taken from hnsw library.
+ 
+ /**
 diff --git a/extern/diskann/DiskANN/include/diskann_logger.h b/extern/diskann/DiskANN/include/diskann_logger.h
 index 0b17807d..3ee06dd3 100644
 --- a/extern/diskann/DiskANN/include/diskann_logger.h
@@ -288,6 +301,26 @@ index 0b17807d..3ee06dd3 100644
  {
      LL_Info = 0,
      LL_Error,
+diff --git a/extern/diskann/DiskANN/include/locking.h b/extern/diskann/DiskANN/include/locking.h
+index 2a70f4ff..9ad81795 100644
+--- a/extern/diskann/DiskANN/include/locking.h
++++ b/extern/diskann/DiskANN/include/locking.h
+@@ -3,13 +3,13 @@
+ 
+ #include <mutex>
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ #include "windows_slim_lock.h"
+ #endif
+ 
+ namespace diskann
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ using non_recursive_mutex = windows_exclusive_slim_lock;
+ using LockGuard = windows_exclusive_slim_lock_guard;
+ #else
 diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
 index 22fa9f69..d4f8d51d 100644
 --- a/extern/diskann/DiskANN/include/utils.h
@@ -331,6 +364,28 @@ index 22fa9f69..d4f8d51d 100644
  #else
          auto ret = std::string(strerror_r(errno, buff, 1024));
  #endif
+diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
+index 707bb054..d3f4ff0a 100644
+--- a/extern/diskann/DiskANN/src/distance.cpp
++++ b/extern/diskann/DiskANN/src/distance.cpp
+@@ -84,7 +84,7 @@ template <typename T> size_t Distance<T>::get_required_alignment() const
+ 
+ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<int8_t>(a, b, length);
+ #else
+     int magA = 0, magB = 0, scalarProduct = 0;
+@@ -101,7 +101,7 @@ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t len
+ 
+ float DistanceCosineFloat::compare(const float *a, const float *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<float>(a, b, length);
+ #else
+     float magA = 0, magB = 0, scalarProduct = 0;
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
 --- a/extern/diskann/diskann.cmake
