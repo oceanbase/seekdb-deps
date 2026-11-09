@@ -815,3 +815,16 @@ index 10075a1c..92f5b507 100644
  
  add_library (simd STATIC ${SIMD_SRCS})
  
+diff --git a/src/utils/prefetch.cpp b/src/utils/prefetch.cpp
+index 6aa86c35..22037eb5 100644
+--- a/src/utils/prefetch.cpp
++++ b/src/utils/prefetch.cpp
+@@ -27,7 +27,7 @@ PrefetchImpl<0>(const void* data){};
+ 
+ void
+ PrefetchLines(const void* data, uint64_t size) {
+-    uint64_t n = std::min(size / 64, 63UL);
++    uint64_t n = std::min<uint64_t>(size / 64, 63);
+     switch (n) {
+         PREFETCH_LINE(0);
+         PREFETCH_LINE(1);
