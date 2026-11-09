@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a8f9010..3ecf2fd 100644
+index a8f9010..40ac1c8 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -86,14 +86,22 @@ else ()
@@ -112,7 +112,18 @@ index a8f9010..3ecf2fd 100644
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
  
-@@ -374,9 +393,10 @@ endif ()
+@@ -319,7 +338,9 @@ endif ()
+ 
+ # sources
+ add_subdirectory (src)
+-add_subdirectory (mockimpl)
++if (ENABLE_TESTS)
++    add_subdirectory (mockimpl)
++endif ()
+ if (ENABLE_EXAMPLES)
+     add_subdirectory (examples/cpp)
+ endif ()
+@@ -374,9 +395,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
@@ -405,7 +416,7 @@ index 8a1729c..48d70ef 100644
 +  endif ()
  endif()
 diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
-index 371900a..c8a8477 100644
+index 371900a..4732970 100644
 --- a/extern/spdlog/spdlog.cmake
 +++ b/extern/spdlog/spdlog.cmake
 @@ -16,7 +16,7 @@ ExternalProject_Add(
@@ -413,7 +424,7 @@ index 371900a..c8a8477 100644
      SOURCE_DIR ${source_dir}
      CONFIGURE_COMMAND
 -    	cmake -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
-+    	cmake ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
++        cmake ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
      BUILD_COMMAND
  	cmake --build build --target install --parallel 4
      INSTALL_COMMAND
