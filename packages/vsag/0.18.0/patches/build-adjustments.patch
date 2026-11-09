@@ -153,7 +153,7 @@ index a8f90103..c1693a41 100644
  add_dependencies (vsag version)
 +add_dependencies (vsag_static version)
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
-index 95e07446..29408e14 100644
+index 95e07446..f198b387 100644
 --- a/extern/antlr4/antlr4.cmake
 +++ b/extern/antlr4/antlr4.cmake
 @@ -11,6 +11,10 @@ else ()
@@ -167,6 +167,15 @@ index 95e07446..29408e14 100644
  
  ExternalProject_Add(
          ${name}
+@@ -28,7 +32,7 @@ ExternalProject_Add(
+         BINARY_DIR ${binary_dir}
+         BUILD_IN_SOURCE 0
+         CONFIGURE_COMMAND
+-        cmake ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
+         BUILD_COMMAND
+         cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
+         INSTALL_COMMAND cmake --install build
 @@ -48,7 +52,7 @@ include_directories(extern/antlr4/fc)
  file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
  add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
@@ -483,7 +492,7 @@ index 8a1729c2..48d70ef0 100644
 +  endif ()
  endif()
 diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
-index 371900a0..4732970d 100644
+index 371900a0..bcbaf7dc 100644
 --- a/extern/spdlog/spdlog.cmake
 +++ b/extern/spdlog/spdlog.cmake
 @@ -16,7 +16,7 @@ ExternalProject_Add(
@@ -491,7 +500,7 @@ index 371900a0..4732970d 100644
      SOURCE_DIR ${source_dir}
      CONFIGURE_COMMAND
 -    	cmake -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
-+        cmake ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
      BUILD_COMMAND
  	cmake --build build --target install --parallel 4
      INSTALL_COMMAND

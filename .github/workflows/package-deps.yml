@@ -131,6 +131,14 @@ jobs:
           echo "CC=$llvm_prefix/bin/clang" >> "$GITHUB_ENV"
           echo "CXX=$llvm_prefix/bin/clang++" >> "$GITHUB_ENV"
 
+      - name: Select Windows VSAG Clang compiler
+        if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && inputs.version == '0.18.0' }}
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command clang-cl.exe -ErrorAction Stop).Source
+          "CC=$compiler" >> $env:GITHUB_ENV
+          "CXX=$compiler" >> $env:GITHUB_ENV
+
       - uses: mamba-org/setup-micromamba@v3
         if: ${{ matrix.target.family == 'linux' }}
         with:
