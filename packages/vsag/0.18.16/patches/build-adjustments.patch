@@ -1,8 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 8846f0ad..e18f0fad 100644
+index 8846f0ad..89e4d708 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -86,14 +86,22 @@ else ()
+@@ -26,6 +26,10 @@ project (VSAG
+         LANGUAGES C CXX
+ )
+ 
++if (WIN32)
++    add_compile_definitions (NOMINMAX)
++endif ()
++
+ include (cmake/ColorizeMessage.cmake)
+ 
+ message (STATUS "CPU ARCH: ${Yellow}${CMAKE_HOST_SYSTEM_PROCESSOR}${CR}")
+@@ -86,14 +90,22 @@ else ()
  endif ()
  
  if (ENABLE_WERROR)
@@ -30,7 +41,7 @@ index 8846f0ad..e18f0fad 100644
      set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -gdwarf-4")
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-4")
  
-@@ -128,7 +136,7 @@ if (ENABLE_LIBCXX)
+@@ -128,7 +140,7 @@ if (ENABLE_LIBCXX)
          message (FATAL_ERROR "libc++ or libc++abi not found")
      endif ()
  else ()
@@ -39,7 +50,7 @@ index 8846f0ad..e18f0fad 100644
          set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
      endif ()
  endif ()
-@@ -161,8 +169,10 @@ if (CCACHE_FOUND AND ENABLE_CCACHE)
+@@ -161,8 +173,10 @@ if (CCACHE_FOUND AND ENABLE_CCACHE)
      set_property (GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
  endif ()
  
@@ -52,7 +63,7 @@ index 8846f0ad..e18f0fad 100644
  
  set (ld_flags
          "-L${CMAKE_INSTALL_PREFIX}/lib"
-@@ -188,20 +198,31 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
+@@ -188,20 +202,31 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
  endif ()
  string (JOIN " " ld_flags ${ld_flags})
  
@@ -88,7 +99,7 @@ index 8846f0ad..e18f0fad 100644
  
  set (common_configure_envs
          "env"
-@@ -231,7 +252,9 @@ include (extern/openblas/openblas.cmake)
+@@ -231,7 +256,9 @@ include (extern/openblas/openblas.cmake)
  include (extern/mkl/mkl.cmake)
  include (extern/diskann/diskann.cmake)
  include (extern/spdlog/spdlog.cmake)
@@ -99,7 +110,7 @@ index 8846f0ad..e18f0fad 100644
  include (extern/cpuinfo/cpuinfo.cmake)
  include (extern/fmt/fmt.cmake)
  include (extern/thread_pool/thread_pool.cmake)
-@@ -255,18 +278,27 @@ set (CMAKE_CXX_STANDARD 17)
+@@ -255,18 +282,27 @@ set (CMAKE_CXX_STANDARD 17)
  set (CMAKE_CXX_STANDARD_REQUIRED ON)
  
  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -133,7 +144,7 @@ index 8846f0ad..e18f0fad 100644
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
  
-@@ -320,7 +352,9 @@ endif ()
+@@ -320,7 +356,9 @@ endif ()
  
  # sources
  add_subdirectory (src)
@@ -144,7 +155,7 @@ index 8846f0ad..e18f0fad 100644
  if (ENABLE_EXAMPLES)
      add_subdirectory (examples/cpp)
  endif ()
-@@ -375,9 +409,10 @@ endif ()
+@@ -375,9 +413,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
