@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a8f9010..40ac1c8 100644
+index a8f9010..5cfb48d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -86,14 +86,22 @@ else ()
@@ -52,7 +52,7 @@ index a8f9010..40ac1c8 100644
  
  set (ld_flags
          "-L${CMAKE_INSTALL_PREFIX}/lib"
-@@ -188,20 +198,25 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
+@@ -188,20 +198,31 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
  endif ()
  string (JOIN " " ld_flags ${ld_flags})
  
@@ -79,10 +79,16 @@ index a8f9010..40ac1c8 100644
 +if (CMAKE_TOOLCHAIN_FILE)
 +    list (APPEND common_cmake_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
 +endif ()
++if (ANDROID)
++    list (APPEND common_cmake_args
++        "-DANDROID_ABI=${ANDROID_ABI}"
++        "-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
++        "-DANDROID_NDK=${ANDROID_NDK}")
++endif ()
  
  set (common_configure_envs
          "env"
-@@ -230,7 +245,9 @@ include (extern/openblas/openblas.cmake)
+@@ -230,7 +251,9 @@ include (extern/openblas/openblas.cmake)
  include (extern/mkl/mkl.cmake)
  include (extern/diskann/diskann.cmake)
  include (extern/spdlog/spdlog.cmake)
@@ -93,7 +99,7 @@ index a8f9010..40ac1c8 100644
  include (extern/cpuinfo/cpuinfo.cmake)
  include (extern/fmt/fmt.cmake)
  include (extern/thread_pool/thread_pool.cmake)
-@@ -260,12 +277,14 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+@@ -260,12 +283,14 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
  endif ()
  
  # debug or release or sanitize
@@ -112,7 +118,7 @@ index a8f9010..40ac1c8 100644
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
  
-@@ -319,7 +338,9 @@ endif ()
+@@ -319,7 +344,9 @@ endif ()
  
  # sources
  add_subdirectory (src)
@@ -123,7 +129,7 @@ index a8f9010..40ac1c8 100644
  if (ENABLE_EXAMPLES)
      add_subdirectory (examples/cpp)
  endif ()
-@@ -374,9 +395,10 @@ endif ()
+@@ -374,9 +401,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
