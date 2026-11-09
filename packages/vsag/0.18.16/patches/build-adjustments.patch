@@ -301,6 +301,18 @@ index 0b17807d..3ee06dd3 100644
  {
      LL_Info = 0,
      LL_Error,
+diff --git a/extern/diskann/DiskANN/include/local_file_reader.h b/extern/diskann/DiskANN/include/local_file_reader.h
+index e0f77942..c93a6058 100644
+--- a/extern/diskann/DiskANN/include/local_file_reader.h
++++ b/extern/diskann/DiskANN/include/local_file_reader.h
+@@ -3,7 +3,6 @@
+ 
+ #ifndef _WINDOWS
+ 
+-#include <malloc.h>
+ #include <cstdio>
+ #include <mutex>
+ #include <thread>
 diff --git a/extern/diskann/DiskANN/include/locking.h b/extern/diskann/DiskANN/include/locking.h
 index 2a70f4ff..9ad81795 100644
 --- a/extern/diskann/DiskANN/include/locking.h
@@ -386,6 +398,18 @@ index 707bb054..d3f4ff0a 100644
      return diskann::CosineSimilarity2<float>(a, b, length);
  #else
      float magA = 0, magB = 0, scalarProduct = 0;
+diff --git a/extern/diskann/DiskANN/src/math_utils.cpp b/extern/diskann/DiskANN/src/math_utils.cpp
+index 9244715e..ee603359 100644
+--- a/extern/diskann/DiskANN/src/math_utils.cpp
++++ b/extern/diskann/DiskANN/src/math_utils.cpp
+@@ -2,7 +2,6 @@
+ // Licensed under the MIT license.
+ 
+ #include <limits>
+-#include <malloc.h>
+ #include <math_utils.h>
+ // #include <mkl.h>
+ #include <cblas.h>
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
 --- a/extern/diskann/diskann.cmake
