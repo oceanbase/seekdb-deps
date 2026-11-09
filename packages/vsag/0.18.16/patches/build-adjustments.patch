@@ -260,6 +260,19 @@ index f064f7d4..d4f975c6 100644
 -)
 -
 -ExternalProject_Add_StepTargets(${name} clean)
+diff --git a/extern/diskann/DiskANN/include/diskann_logger.h b/extern/diskann/DiskANN/include/diskann_logger.h
+index 0b17807d..3ee06dd3 100644
+--- a/extern/diskann/DiskANN/include/diskann_logger.h
++++ b/extern/diskann/DiskANN/include/diskann_logger.h
+@@ -22,7 +22,7 @@ using std::cerr;
+ using std::cout;
+ #endif
+ 
+-enum class DISKANN_DLLEXPORT LogLevel
++enum class LogLevel
+ {
+     LL_Info = 0,
+     LL_Error,
 diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
 index 22fa9f69..bc882259 100644
 --- a/extern/diskann/DiskANN/include/utils.h
@@ -623,6 +636,18 @@ index 1977ed7b..6eef6856 100644
          auto ret = raw_allocator_->Reallocate(p, size);
          if (not ret) {
              throw std::bad_alloc();
+diff --git a/src/impl/cluster/kmeans_cluster.cpp b/src/impl/cluster/kmeans_cluster.cpp
+index 636a9a95..a32fd3b9 100644
+--- a/src/impl/cluster/kmeans_cluster.cpp
++++ b/src/impl/cluster/kmeans_cluster.cpp
+@@ -17,6 +17,7 @@
+ 
+ #include <omp.h>
+ 
++#include <numeric>
+ #include <random>
+ 
+ #include "algorithm/inner_index_interface.h"
 diff --git a/src/impl/heap/memmove_heap.cpp b/src/impl/heap/memmove_heap.cpp
 index 9b023fc0..f625d269 100644
 --- a/src/impl/heap/memmove_heap.cpp

@@ -79,6 +79,7 @@ def build(ctx):
     options = {
         "CMAKE_INSTALL_PREFIX": str(ctx.build_dir / "install"),
         "ENABLE_CXX11_ABI": True,
+        "ENABLE_WERROR": ctx.target.family != "windows",
         "ENABLE_INTEL_MKL": False,
         "ENABLE_LIBAIO": ctx.target.family == "linux",
         "ENABLE_TESTS": False,
