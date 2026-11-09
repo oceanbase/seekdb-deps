@@ -721,9 +721,18 @@ index 1ed8a547..04ed5460 100644
 \ No newline at end of file
 +}  // namespace vsag
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
-index 10075a1c..e6cededc 100644
+index 10075a1c..92f5b507 100644
 --- a/src/simd/CMakeLists.txt
 +++ b/src/simd/CMakeLists.txt
+@@ -43,7 +43,7 @@ if (DIST_CONTAINS_SSE)
+     set_source_files_properties (
+             sse.cpp
+             PROPERTIES COMPILE_FLAGS
+-            "-msse -msse2 -msse3 -mssse3 -msse4 -msse4a -msse4.1 -msse4.2")
++            "-msse -msse2 -msse3 -mssse3 -msse4a -msse4.1 -msse4.2")
+ endif ()
+ if (DIST_CONTAINS_AVX)
+     set_source_files_properties (avx.cpp PROPERTIES COMPILE_FLAGS "-mavx -mf16c")
 @@ -75,6 +75,7 @@ if (DIST_CONTAINS_SVE)
  endif ()
  
