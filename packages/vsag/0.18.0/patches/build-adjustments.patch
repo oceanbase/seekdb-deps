@@ -309,10 +309,10 @@ index a1b4e953..b23a5b6b 100644
  endif()
  
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed4..af9ef61f 100644
+index 3db31ed4..acc7b527 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -1,59 +1,74 @@
+@@ -1,59 +1,76 @@
 -
  set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
@@ -381,7 +381,9 @@ index 3db31ed4..af9ef61f 100644
 +            -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
 +            -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
 +            -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
-+            -DBUILD_WITHOUT_LAPACK=ON
++            -DBUILD_WITHOUT_LAPACK=OFF
++            -DC_LAPACK=ON
++            -DNO_LAPACKE=OFF
 +            -DBUILD_TESTING=OFF
 +            -DBUILD_STATIC_LIBS=ON
 +            -DBUILD_SHARED_LIBS=OFF
