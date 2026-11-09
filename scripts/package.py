@@ -351,10 +351,15 @@ def apply_patches(package_root, metadata, source_dir, workspace):
     patches = patch_records(package_root, metadata)
     prepared = workspace / "source"
     copy_tree(source_dir, prepared)
-    for patch in patches:
-        patch_path = package_root / patch["path"]
-        run(["git", "apply", "--check", str(patch_path)], cwd=prepared)
-        run(["git", "apply", "--binary", str(patch_path)], cwd=prepared)
+    if patches:
+        run(["git", "init", "--quiet"], cwd=prepared)
+        try:
+            for patch in patches:
+                patch_path = package_root / patch["path"]
+                run(["git", "apply", "--check", str(patch_path)], cwd=prepared)
+                run(["git", "apply", "--binary", str(patch_path)], cwd=prepared)
+        finally:
+            shutil.rmtree(str(prepared / ".git"))
     return prepared, patches
 
 

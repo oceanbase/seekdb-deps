@@ -114,8 +114,12 @@ def build(ctx):
     }
     if ctx.target.architecture == "x86_64":
         compiler_libraries["libquadmath_static.a"] = (fc, "libquadmath.a")
+    runtime_dir = ctx.build_dir / "runtime"
+    runtime_dir.mkdir()
     for destination, (compiler, name) in compiler_libraries.items():
-        ctx.install(_compiler_library(ctx, compiler, name), "lib/" + destination)
+        copied = runtime_dir / destination
+        shutil.copy2(_compiler_library(ctx, compiler, name), copied)
+        ctx.install(copied, "lib/" + destination)
         staged_libraries.append(ctx.stage_dir / "lib" / destination)
 
     strip_tool = subprocess.check_output(
