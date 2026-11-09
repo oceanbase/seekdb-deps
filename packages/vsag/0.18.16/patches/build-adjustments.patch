@@ -1520,3 +1520,19 @@ index 6aa86c35..22037eb5 100644
      switch (n) {
          PREFETCH_LINE(0);
          PREFETCH_LINE(1);
+diff --git a/src/utils/util_functions.cpp b/src/utils/util_functions.cpp
+index 94d25e88..dd383fe6 100644
+--- a/src/utils/util_functions.cpp
++++ b/src/utils/util_functions.cpp
+@@ -165,7 +165,11 @@ get_current_time() {
+     auto now = std::chrono::system_clock::now();
+     auto now_c = std::chrono::system_clock::to_time_t(now);
+     std::tm now_tm{};
++#ifdef _WIN32
++    if (localtime_s(&now_tm, &now_c) != 0) {
++#else
+     if (localtime_r(&now_c, &now_tm) == nullptr) {
++#endif
+         return "invalid time";
+     }
+     std::ostringstream oss;
