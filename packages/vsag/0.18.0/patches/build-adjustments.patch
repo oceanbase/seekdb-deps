@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a8f90103..5cfb48d4 100644
+index a8f90103..ac08a314 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -86,14 +86,22 @@ else ()
@@ -111,9 +111,10 @@ index a8f90103..5cfb48d4 100644
 +if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 -elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-+elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
+-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
 -elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
 +elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize" AND NOT MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
