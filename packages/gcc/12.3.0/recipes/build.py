@@ -5,7 +5,7 @@ import shutil
 import subprocess
 
 
-PREFIX = Path("devtools")
+BUILD_INSTALL_PREFIX = Path("usr")
 
 
 def _copy(source, destination):
@@ -27,7 +27,7 @@ def build(ctx):
     configure = [
         str(ctx.source_dir / "configure"),
         "--build=" + triple,
-        "--prefix=/" + PREFIX.as_posix(),
+        "--prefix=/" + BUILD_INSTALL_PREFIX.as_posix(),
         "--enable-languages=c,c++",
         "--disable-bootstrap",
         "--disable-multilib",
@@ -65,8 +65,8 @@ def build(ctx):
 
 def stage(ctx, installed):
     triple = "{}-redhat-linux".format("aarch64" if ctx.target.architecture == "arm64" else "x86_64")
-    source_prefix = installed / PREFIX
-    target_prefix = ctx.stage_dir / PREFIX
+    source_prefix = installed / BUILD_INSTALL_PREFIX
+    target_prefix = ctx.stage_dir
     (target_prefix / "include").mkdir(parents=True)
     (target_prefix / "lib").mkdir(parents=True)
     (target_prefix / "lib64").mkdir(parents=True)

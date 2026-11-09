@@ -49,11 +49,11 @@
   },
   "required_artifacts": {
     "default": [
-      "devtools/include/c++/12/vector",
-      "devtools/lib64/libstdc++.a",
-      "devtools/lib64/libstdc++.so.6.0.30",
-      "devtools/lib64/libgcc_s.so.1",
-      "devtools/lib64/libatomic.a"
+      "include/c++/12/vector",
+      "lib64/libstdc++.a",
+      "lib64/libstdc++.so.6.0.30",
+      "lib64/libgcc_s.so.1",
+      "lib64/libatomic.a"
     ]
   }
 }
