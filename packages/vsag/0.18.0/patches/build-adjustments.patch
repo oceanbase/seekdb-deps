@@ -550,19 +550,43 @@ index d21476be..cf7e2696 100644
      /**
       * @brief Constructs a new object of type T.
 diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
-index 09a119b5..080ad0df 100644
+index 09a119b5..0b6fe127 100644
 --- a/src/impl/allocator/default_allocator.cpp
 +++ b/src/impl/allocator/default_allocator.cpp
-@@ -34,7 +34,7 @@ DefaultAllocator::~DefaultAllocator() = default;
+@@ -15,6 +15,7 @@
+ 
+ #include "default_allocator.h"
+ 
++#include <cstdlib>
+ #include <fmt/format.h>
+ 
+ #include "impl/logger/logger.h"
+@@ -26,7 +27,7 @@ DefaultAllocator::~DefaultAllocator() {
+         logger::error(fmt::format("There is a memory leak in {}, size: {}",
+                                   DefaultAllocator::Name(),
+                                   allocated_ptrs_.size()));
+-        abort();
++        std::abort();
+     }
+ }
+ #else
+@@ -34,8 +35,8 @@ DefaultAllocator::~DefaultAllocator() = default;
  #endif
  
  void*
 -DefaultAllocator::Allocate(size_t size) {
+-    auto* ptr = malloc(size);
 +DefaultAllocator::Allocate(AllocatorSize size) {
-     auto* ptr = malloc(size);
++    auto* ptr = std::malloc(size);
  #ifndef NDEBUG
      std::lock_guard<std::mutex> guard(set_mutex_);
-@@ -60,7 +60,7 @@ DefaultAllocator::Deallocate(void* p) {
+     allocated_ptrs_.insert(ptr);
+@@ -56,11 +57,11 @@ DefaultAllocator::Deallocate(void* p) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    free(p);
++    std::free(p);
  }
  
  void*
@@ -571,6 +595,15 @@ index 09a119b5..080ad0df 100644
  #ifndef NDEBUG
      if (p == nullptr) {
          return Allocate(size);
+@@ -72,7 +73,7 @@ DefaultAllocator::Reallocate(void* p, size_t size) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    auto* ptr = realloc(p, size);
++    auto* ptr = std::realloc(p, size);
+ #ifndef NDEBUG
+     allocated_ptrs_.insert(ptr);
+ #endif
 diff --git a/src/impl/allocator/default_allocator.h b/src/impl/allocator/default_allocator.h
 index 4cffca62..8c7497ea 100644
 --- a/src/impl/allocator/default_allocator.h
