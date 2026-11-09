@@ -1,11 +1,9 @@
 """Build only the LLVM tools used by seekdb's Linux Clang toolchain."""
 
-from pathlib import Path
 import shutil
 import subprocess
 
 
-PREFIX = Path("devtools")
 TOOLS = (
     "clang", "lld", "llvm-ar", "llvm-cov", "llvm-cxxfilt", "llvm-dwp",
     "llvm-nm", "llvm-objcopy", "llvm-objdump",
@@ -55,14 +53,13 @@ def build(ctx):
     configure = [
         "cmake", "-S", str(ctx.source_dir / "llvm"),
         "-B", str(ctx.build_dir), "-G", "Ninja",
-        "-DCMAKE_INSTALL_PREFIX=/" + PREFIX.as_posix(),
     ] + ctx.cmake_args
     configure += ["-D{}={}".format(key, value) for key, value in sorted(options.items())]
     ctx.run(configure)
     ctx.run(["cmake", "--build", str(ctx.build_dir), "--parallel", str(ctx.jobs),
              "--target", *TOOLS])
 
-    target_prefix = ctx.stage_dir / PREFIX
+    target_prefix = ctx.stage_dir
     target_bin = target_prefix / "bin"
     target_bin.mkdir(parents=True)
     for tool in TOOLS:
