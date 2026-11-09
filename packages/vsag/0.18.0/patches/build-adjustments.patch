@@ -648,6 +648,28 @@ index 199731c2..79b4aa82 100644
  if (HAVE_LIBAIO)
      target_compile_definitions (io PUBLIC -DHAVE_LIBAIO=1)
      target_link_libraries (io PUBLIC fmt::fmt aio coverage_config)
+diff --git a/src/io/buffer_io.cpp b/src/io/buffer_io.cpp
+index 9cd53f41..5cfa9f38 100644
+--- a/src/io/buffer_io.cpp
++++ b/src/io/buffer_io.cpp
+@@ -44,7 +44,7 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
+ 
+ void
+ BufferIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+-    auto ret = pwrite64(this->fd_, data, size, static_cast<int64_t>(offset));
++    auto ret = pwrite(this->fd_, data, size, static_cast<off_t>(offset));
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("write bytes {} less than {}", ret, size));
+@@ -59,7 +59,7 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
+     if (size == 0) {
+         return true;
+     }
+-    auto ret = pread64(this->fd_, data, size, static_cast<int64_t>(offset));
++    auto ret = pread(this->fd_, data, size, static_cast<off_t>(offset));
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("read bytes {} less than {}", ret, size));
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 10075a1c..e6cededc 100644
 --- a/src/simd/CMakeLists.txt
