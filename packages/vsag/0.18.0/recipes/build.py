@@ -1,6 +1,8 @@
 """Build VSAG and stage the archives used by seekdb on each platform."""
 
 from pathlib import Path
+import os
+import shutil
 import subprocess
 import sys
 
@@ -52,12 +54,38 @@ def _built_library(ctx, candidates):
     raise ValueError("VSAG build output is missing: " + ", ".join(candidates))
 
 
+def _compiler_library(ctx, compiler, name):
+    path = subprocess.check_output(
+        [compiler, "-print-file-name=" + name],
+        env=ctx.environment, text=True,
+    ).strip()
+    if not path or path == name or not Path(path).is_file():
+        raise ValueError("Compiler runtime is missing: " + name)
+    return Path(path)
+
+
 def build(ctx):
+    if ctx.target.family == "linux":
+        fc = ctx.environment.get("FC", "gfortran")
+        if not shutil.which(fc, path=ctx.environment.get("PATH")):
+            raise ValueError("VSAG build needs a Fortran compiler for OpenBLAS: " + fc)
+        ctx.environment["FC"] = fc
+
+        libaio_header = Path("/usr/include/libaio.h")
+        if not libaio_header.is_file():
+            raise ValueError("VSAG build needs the libaio development header")
+        build_headers = ctx.build_dir / "build-headers"
+        build_headers.mkdir()
+        shutil.copy2(libaio_header, build_headers / "libaio.h")
+        ctx.environment["CPATH"] = os.pathsep.join(
+            value for value in (str(build_headers), ctx.environment.get("CPATH", "")) if value
+        )
+
     options = {
         "CMAKE_INSTALL_PREFIX": str(ctx.build_dir / "install"),
         "ENABLE_CXX11_ABI": True,
         "ENABLE_INTEL_MKL": False,
-        "ENABLE_LIBAIO": False,
+        "ENABLE_LIBAIO": ctx.target.family == "linux",
         "ENABLE_TESTS": False,
         "ENABLE_EXAMPLES": False,
         "ENABLE_TOOLS": False,
@@ -85,8 +113,10 @@ def build(ctx):
             ctx.install(header, "include/vsag/" + header.name)
 
     libraries = WINDOWS_LIBRARIES if ctx.target.family == "windows" else LIBRARIES
+    staged_libraries = []
     for name, candidates in libraries.items():
         ctx.install(_built_library(ctx, candidates), "lib/" + name)
+        staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "macos":
         ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
     if ctx.target.family == "android":
@@ -94,6 +124,33 @@ def build(ctx):
             _built_library(ctx, ("spdlog/install/lib/libspdlog.a",)),
             "lib/libspdlog.a",
         )
+    if ctx.target.family == "linux":
+        compiler_libraries = {
+            "libgfortran_static.a": (fc, "libgfortran.a"),
+            "libgomp_static.a": (ctx.environment["CXX"], "libgomp.a"),
+        }
+        if ctx.target.architecture == "x86_64":
+            compiler_libraries["libquadmath_static.a"] = (fc, "libquadmath.a")
+        runtime_dir = ctx.build_dir / "runtime"
+        runtime_dir.mkdir()
+        for destination, (compiler, name) in compiler_libraries.items():
+            copied = runtime_dir / destination
+            shutil.copy2(_compiler_library(ctx, compiler, name), copied)
+            ctx.install(copied, "lib/" + destination)
+            staged_libraries.append(ctx.stage_dir / "lib" / destination)
+
+        strip_tool = subprocess.check_output(
+            [ctx.environment["CC"], "-print-prog-name=strip"],
+            env=ctx.environment, text=True,
+        ).strip()
+        for archive in staged_libraries:
+            ctx.run([strip_tool, "--strip-debug", str(archive)])
+
+        license_directory = Path(__file__).resolve().parents[1] / "licenses"
+        for name in ("COPYING3", "COPYING.RUNTIME"):
+            staged_license = ctx.build_dir / name
+            shutil.copyfile(license_directory / name, staged_license)
+            ctx.install(staged_license, "share/licenses/vsag/third-party/gcc/" + name)
 
     for dependency, (source_path, licenses) in THIRD_PARTY_LICENSES.items():
         for relative in licenses:

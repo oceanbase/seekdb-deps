@@ -3,10 +3,18 @@
   "name": "vsag",
   "version": "0.18.0",
   "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
     "macos-arm64-min13",
     "windows-x86_64-md",
     "android-arm64-v8a-api26"
   ],
+  "build_dependencies": {
+    "linux": {
+      "compilers": ["fortran"],
+      "system_packages": ["libaio-dev"]
+    }
+  },
   "source": {
     "path": "source",
     "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.18.0",
@@ -25,6 +33,19 @@
     "source_path": "LICENSE"
   },
   "required_artifacts": {
+    "linux": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libgfortran_static.a",
+      "lib/libgomp_static.a"
+    ],
     "macos": [
       "include/vsag/vsag.h",
       "lib/libvsag_static.a",
