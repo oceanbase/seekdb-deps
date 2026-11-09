@@ -339,10 +339,10 @@ index a1b4e953..b23a5b6b 100644
  endif()
  
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed4..6814b4b7 100644
+index 3db31ed4..5a3b909b 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -1,59 +1,82 @@
+@@ -1,59 +1,85 @@
 -
  set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
@@ -447,6 +447,9 @@ index 3db31ed4..6814b4b7 100644
 -        install(FILES ${lib64_file}
 -                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
 +else ()
++    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
++        set(openblas_make_target TARGET=CORE2)
++    endif ()
 +    ExternalProject_Add(
 +        ${name}
 +        URL https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.23
@@ -458,8 +461,8 @@ index 3db31ed4..6814b4b7 100644
 +        DOWNLOAD_DIR ${DOWNLOAD_DIR}
 +        SOURCE_DIR ${source_dir}
 +        CONFIGURE_COMMAND ""
-+        BUILD_COMMAND ${common_configure_envs} OMP_NUM_THREADS=1 make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 -j${NUM_BUILDING_JOBS}
-+        INSTALL_COMMAND make DYNAMIC_ARCH=1 PREFIX=${install_dir} install
++        BUILD_COMMAND ${common_configure_envs} OMP_NUM_THREADS=1 make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 ${openblas_make_target} -j${NUM_BUILDING_JOBS}
++        INSTALL_COMMAND make DYNAMIC_ARCH=1 ${openblas_make_target} PREFIX=${install_dir} install
 +        BUILD_IN_SOURCE 1
 +        LOG_CONFIGURE TRUE
 +        LOG_BUILD TRUE
