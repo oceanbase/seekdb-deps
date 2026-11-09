@@ -15,7 +15,6 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import time
 from pathlib import PurePosixPath
 from urllib.request import Request, urlopen
 
@@ -86,22 +85,6 @@ def package_paths(name, version):
         raise ValueError("Package source revision must be a Git object id")
     if not re.match(r"^[0-9a-fA-F]{64}$", source["archive_sha256"]):
         raise ValueError("Package source archive_sha256 must be a SHA256 digest")
-    if not isinstance(source.get("extra_archives", []), list):
-        raise ValueError("Package extra_archives must be a list")
-    for extra in source.get("extra_archives", []):
-        if not isinstance(extra, dict):
-            raise ValueError("Extra source archive must be an object")
-        for field in ("path", "url", "archive_sha256", "strip_prefix"):
-            if field not in extra:
-                raise ValueError("Extra source archive is missing field: " + field)
-        extra_path = safe_relative(extra["path"], "extra source path")
-        if len(extra_path.parts) != 1:
-            raise ValueError("Extra source path must be a top-level directory")
-        safe_relative(extra["strip_prefix"], "extra source strip_prefix")
-        if not extra["url"].startswith("https://"):
-            raise ValueError("Extra source archive URL must use HTTPS")
-        if not re.fullmatch(r"[0-9a-fA-F]{64}", extra["archive_sha256"]):
-            raise ValueError("Extra source archive SHA256 must be a SHA256 digest")
     for field in ("spdx_id", "source_path"):
         if field not in metadata["license"]:
             raise ValueError("Package license metadata is missing field: " + field)
@@ -139,33 +122,17 @@ def repository_commit():
     return run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture=True), True
 
 
-def download_source_archive(source, workspace, filename="upstream-source.tar.gz"):
-    expected_sha256 = source["archive_sha256"].lower()
-    cache_directory = os.environ.get("SEEKDB_DEPS_SOURCE_CACHE")
-    cache_path = Path(cache_directory).expanduser() / expected_sha256 if cache_directory else None
-    if cache_path is not None and cache_path.exists():
-        actual_sha256 = sha256(cache_path)
-        if actual_sha256 != expected_sha256:
-            raise ValueError("Cached source SHA256 mismatch: " + str(cache_path))
-        return cache_path
-
-    archive_path = workspace / filename
+def download_source_archive(source, workspace):
+    archive_path = workspace / "upstream-source.tar.gz"
     request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
-    for attempt in range(3):
-        try:
-            with urlopen(request, timeout=120) as response:
-                if not response.geturl().startswith("https://"):
-                    raise ValueError("Package source download did not remain on HTTPS")
-                with archive_path.open("wb") as output:
-                    shutil.copyfileobj(response, output)
-            break
-        except OSError:
-            archive_path.unlink(missing_ok=True)
-            if attempt == 2:
-                raise
-            time.sleep(2 ** attempt)
+    with urlopen(request, timeout=120) as response:
+        if not response.geturl().startswith("https://"):
+            raise ValueError("Package source download did not remain on HTTPS")
+        with archive_path.open("wb") as output:
+            shutil.copyfileobj(response, output)
 
     actual_sha256 = sha256(archive_path)
+    expected_sha256 = source["archive_sha256"].lower()
     if actual_sha256 != expected_sha256:
         archive_path.unlink()
         raise ValueError(
@@ -173,15 +140,6 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
                 expected_sha256, actual_sha256
             )
         )
-    if cache_path is not None:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=str(cache_path.parent), delete=False) as temporary:
-            temporary_path = Path(temporary.name)
-        try:
-            shutil.copyfile(str(archive_path), str(temporary_path))
-            os.replace(str(temporary_path), str(cache_path))
-        finally:
-            temporary_path.unlink(missing_ok=True)
     return archive_path
 
 
@@ -241,9 +199,8 @@ def extract_source_archive(archive_path, destination, strip_prefix):
                     raise ValueError("Upstream source archive contains a symlink parent: " + str(relative))
                 parent = parent.parent
 
-        # Read file contents in archive order so compressed tar streams do not seek
-        # backwards for every member. Defer symlinks until after regular files.
-        entries.sort(key=lambda item: item[2] == "symlink")
+        entries.sort(key=lambda item: (0 if item[2] == "directory" else 1 if item[2] == "file" else 2,
+                                       len(item[1].parts), item[1].as_posix()))
         for member, relative, kind in entries:
             output_path = destination.joinpath(*relative.parts)
             if kind == "directory":
@@ -274,44 +231,28 @@ def source_revision(package_root, metadata, repo_checkout, workspace):
         document = verify_manifest(ROOT, expected_type="source")
         upstream = document.get("upstream", {})
         if (upstream.get("revision") != source["revision"]
-                or upstream.get("archive_sha256") != source["archive_sha256"]
-                or upstream.get("extra_archives", []) != source.get("extra_archives", [])):
+                or upstream.get("archive_sha256") != source["archive_sha256"]):
             raise ValueError("Source bundle and package metadata upstream pins do not match")
         if not source_dir.is_dir():
             raise ValueError("Pinned upstream source is missing: " + str(source_dir))
-        for extra in source.get("extra_archives", []):
-            if not (source_dir / safe_relative(extra["path"], "extra source path")).is_dir():
-                raise ValueError("Pinned extra source is missing: " + extra["path"])
         return source["revision"], source_dir
 
     workspace.mkdir(parents=True, exist_ok=True)
     archive_path = download_source_archive(source, workspace)
     source_dir = workspace / "source"
     extract_source_archive(archive_path, source_dir, source["strip_prefix"])
-    for index, extra in enumerate(source.get("extra_archives", [])):
-        relative = safe_relative(extra["path"], "extra source path")
-        destination = source_dir / relative
-        if destination.exists() or destination.is_symlink():
-            raise ValueError("Extra source path overlaps another source: " + extra["path"])
-        extra_archive = download_source_archive(
-            extra, workspace, "extra-source-{}.tar.gz".format(index)
-        )
-        extract_source_archive(extra_archive, destination, extra["strip_prefix"])
     return source["revision"], source_dir
 
 
 def upstream_record(metadata, source_revision_sha):
     source = metadata["source"]
-    record = {
+    return {
         "repository": source["repository"],
         "url": source["url"],
         "tag": source["tag"],
         "revision": source_revision_sha,
         "archive_sha256": source["archive_sha256"],
     }
-    if source.get("extra_archives"):
-        record["extra_archives"] = source["extra_archives"]
-    return record
 
 
 def patch_records(package_root, metadata):
