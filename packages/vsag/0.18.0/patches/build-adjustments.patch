@@ -308,10 +308,10 @@ index a1b4e95..b23a5b6 100644
  endif()
  
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index 3db31ed..fa3f075 100644
+index 3db31ed..ce01749 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -1,59 +1,69 @@
+@@ -1,59 +1,70 @@
 -
  set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
@@ -390,6 +390,7 @@ index 3db31ed..fa3f075 100644
 +            -DDYNAMIC_ARCH=OFF
 +            -DTARGET=${openblas_target}
 +        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target openblas_static --parallel ${NUM_BUILDING_JOBS}
++        INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> --prefix ${install_dir}
 +        LOG_CONFIGURE TRUE
 +        LOG_BUILD TRUE
 +        LOG_INSTALL TRUE
