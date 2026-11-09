@@ -50,12 +50,12 @@ index 06b1c07..a9e06eb 100644
          PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
          TMP_DIR ${BUILD_INFO_DIR}
 diff --git a/extern/boost/boost.cmake b/extern/boost/boost.cmake
-index 61ba4d3..1b173f8 100644
+index 61ba4d3..f2bd815 100644
 --- a/extern/boost/boost.cmake
 +++ b/extern/boost/boost.cmake
-@@ -1,72 +1,2 @@
--# Copyright (c) 2022 Ant Group. All rights reserved.
--
+@@ -1,72 +1,5 @@
+ # Copyright (c) 2022 Ant Group. All rights reserved.
+ 
 -cmake_policy(SET CMP0114 NEW)
 -
 -set(name boost)
@@ -126,6 +126,7 @@ index 61ba4d3..1b173f8 100644
 -
 -ExternalProject_Add_StepTargets(${name} clean)
 -
++# DiskANN uses Boost dynamic_bitset headers but no Boost libraries.
 +add_custom_target(boost)
 +include_directories(${CMAKE_CURRENT_SOURCE_DIR}/vendor_boost)
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
