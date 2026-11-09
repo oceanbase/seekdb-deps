@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7ca61cb..789d8d3 100644
+index 7ca61cb..c52d781 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -188,7 +188,9 @@ include (extern/openblas/openblas.cmake)
@@ -13,7 +13,7 @@ index 7ca61cb..789d8d3 100644
  include (extern/cpuinfo/cpuinfo.cmake)
  include (extern/fmt/fmt.cmake)
  include (extern/thread_pool/thread_pool.cmake)
-@@ -312,7 +314,7 @@ endif ()
+@@ -312,9 +314,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
@@ -22,6 +22,9 @@ index 7ca61cb..789d8d3 100644
          -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
          -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+ )
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
 diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
 index 5581113..fa401de 100644
 --- a/cmake/GenerateVersionHeader.cmake
