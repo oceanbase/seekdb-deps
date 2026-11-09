@@ -478,6 +478,134 @@ index 371900a0..4732970d 100644
      BUILD_COMMAND
  	cmake --build build --target install --parallel 4
      INSTALL_COMMAND
+diff --git a/include/vsag/allocator.h b/include/vsag/allocator.h
+index d21476be..cf7e2696 100644
+--- a/include/vsag/allocator.h
++++ b/include/vsag/allocator.h
+@@ -14,10 +14,19 @@
+ 
+ #pragma once
+ 
++#include <cstddef>
++#include <cstdint>
+ #include <string>
+ 
+ namespace vsag {
+ 
++// seekdb overrides these methods with uint64_t on macOS.
++#if defined(__APPLE__)
++using AllocatorSize = uint64_t;
++#else
++using AllocatorSize = size_t;
++#endif
++
+ /**
+  * @class Allocator
+  * @brief An abstract base class for custom memory management.
+@@ -49,7 +58,7 @@ public:
+      * @return void* Pointer to the allocated memory block.
+      */
+     virtual void*
+-    Allocate(size_t size) = 0;
++    Allocate(AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Deallocates a previously allocated block of memory.
+@@ -73,7 +82,7 @@ public:
+      * @return void* Pointer to the reallocated memory block.
+      */
+     virtual void*
+-    Reallocate(void* p, size_t size) = 0;
++    Reallocate(void* p, AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Constructs a new object of type T.
+diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
+index 09a119b5..080ad0df 100644
+--- a/src/impl/allocator/default_allocator.cpp
++++ b/src/impl/allocator/default_allocator.cpp
+@@ -34,7 +34,7 @@ DefaultAllocator::~DefaultAllocator() = default;
+ #endif
+ 
+ void*
+-DefaultAllocator::Allocate(size_t size) {
++DefaultAllocator::Allocate(AllocatorSize size) {
+     auto* ptr = malloc(size);
+ #ifndef NDEBUG
+     std::lock_guard<std::mutex> guard(set_mutex_);
+@@ -60,7 +60,7 @@ DefaultAllocator::Deallocate(void* p) {
+ }
+ 
+ void*
+-DefaultAllocator::Reallocate(void* p, size_t size) {
++DefaultAllocator::Reallocate(void* p, AllocatorSize size) {
+ #ifndef NDEBUG
+     if (p == nullptr) {
+         return Allocate(size);
+diff --git a/src/impl/allocator/default_allocator.h b/src/impl/allocator/default_allocator.h
+index 4cffca62..8c7497ea 100644
+--- a/src/impl/allocator/default_allocator.h
++++ b/src/impl/allocator/default_allocator.h
+@@ -35,13 +35,13 @@ public:
+     Name() override;
+ 
+     void*
+-    Allocate(size_t size) override;
++    Allocate(AllocatorSize size) override;
+ 
+     void
+     Deallocate(void* p) override;
+ 
+     void*
+-    Reallocate(void* p, size_t size) override;
++    Reallocate(void* p, AllocatorSize size) override;
+ 
+ private:
+ #ifndef NDEBUG
+diff --git a/src/impl/allocator/safe_allocator.h b/src/impl/allocator/safe_allocator.h
+index 1977ed7b..6eef6856 100644
+--- a/src/impl/allocator/safe_allocator.h
++++ b/src/impl/allocator/safe_allocator.h
+@@ -47,7 +47,7 @@ public:
+     }
+ 
+     void*
+-    Allocate(size_t size) override {
++    Allocate(AllocatorSize size) override {
+         auto ret = raw_allocator_->Allocate(size);
+         if (not ret) {
+             throw std::bad_alloc();
+@@ -61,7 +61,7 @@ public:
+     }
+ 
+     void*
+-    Reallocate(void* p, size_t size) override {
++    Reallocate(void* p, AllocatorSize size) override {
+         auto ret = raw_allocator_->Reallocate(p, size);
+         if (not ret) {
+             throw std::bad_alloc();
+diff --git a/src/index/index_impl_test.cpp b/src/index/index_impl_test.cpp
+index a813735f..91d47f78 100644
+--- a/src/index/index_impl_test.cpp
++++ b/src/index/index_impl_test.cpp
+@@ -196,7 +196,7 @@ public:
+     }
+ 
+     void*
+-    Allocate(size_t size) override {
++    Allocate(AllocatorSize size) override {
+         auto addr = static_cast<void*>(malloc(size));
+         return addr;
+     }
+@@ -207,7 +207,7 @@ public:
+     }
+ 
+     void*
+-    Reallocate(void* p, size_t size) override {
++    Reallocate(void* p, AllocatorSize size) override {
+         auto addr = static_cast<void*>(realloc(p, size));
+         return addr;
+     }
 diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
 index 199731c2..79b4aa82 100644
 --- a/src/io/CMakeLists.txt
