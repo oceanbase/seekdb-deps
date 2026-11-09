@@ -71,7 +71,11 @@ def build(ctx):
             ctx.build_dir.rglob("*-build-*.log")
         ):
             print("VSAG dependency log: " + str(log), file=sys.stderr)
-            print(log.read_text(errors="replace")[-12000:], file=sys.stderr)
+            lines = log.read_text(errors="replace").splitlines()
+            for index, line in enumerate(lines):
+                if any(word in line.lower() for word in ("failed:", "error:", "fatal error", "undefined")):
+                    print("\n".join(lines[max(0, index - 2):index + 5]), file=sys.stderr)
+            print("\n".join(lines[-20:]), file=sys.stderr)
         raise
 
     for header in sorted((ctx.source_dir / "include/vsag").iterdir()):
