@@ -584,6 +584,37 @@ index d21476be..cf7e2696 100644
  
      /**
       * @brief Constructs a new object of type T.
+diff --git a/src/algorithm/hgraph.cpp b/src/algorithm/hgraph.cpp
+index 132baba8..ec7f0bb5 100644
+--- a/src/algorithm/hgraph.cpp
++++ b/src/algorithm/hgraph.cpp
+@@ -1957,12 +1957,12 @@ HGraph::CheckAndMappingExternalParam(const JsonType& external_param,
+     hgraph_parameter->FromJson(inner_json);
+     uint64_t max_degree = hgraph_parameter->bottom_graph_param->max_degree_;
+ 
+-    auto max_degree_threshold = std::max(common_param.dim_, 128L);
++    auto max_degree_threshold = std::max(common_param.dim_, int64_t{128});
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= max_degree) and (max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", max_degree, max_degree_threshold));
+ 
+-    auto construction_threshold = std::max(1000UL, AMPLIFICATION_FACTOR * max_degree);
++    auto construction_threshold = std::max(uint64_t{1000}, AMPLIFICATION_FACTOR * max_degree);
+     CHECK_ARGUMENT((max_degree <= hgraph_parameter->ef_construction) and  // NOLINT
+                        (hgraph_parameter->ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
+diff --git a/src/algorithm/hgraph.h b/src/algorithm/hgraph.h
+index 6075579a..d4e797fc 100644
+--- a/src/algorithm/hgraph.h
++++ b/src/algorithm/hgraph.h
+@@ -16,6 +16,7 @@
+ #pragma once
+ 
+ #include <istream>
++#include <numeric>
+ #include <random>
+ #include <shared_mutex>
+ #include <string>
 diff --git a/src/algorithm/hnswlib/hnswalg.cpp b/src/algorithm/hnswlib/hnswalg.cpp
 index 5950e592..38b062d9 100644
 --- a/src/algorithm/hnswlib/hnswalg.cpp
@@ -650,6 +681,45 @@ index 1889fb27..255936ea 100644
                  const vsag::FilterPtr is_id_allowed = nullptr) const override {
          std::runtime_error("static hnsw does not support range search");
          //        std::priority_queue<std::pair<float, LabelType>> result;
+diff --git a/src/algorithm/ivf_partition/gno_imi_partition.cpp b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+index 76ede916..d29c16fc 100644
+--- a/src/algorithm/ivf_partition/gno_imi_partition.cpp
++++ b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+@@ -349,7 +349,7 @@ GNOIMIPartition::inner_classify_datas(BruteForce& route_index, const float* data
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max(int64_t{10}, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result = route_index.KnnSearch(query, buckets_per_data, search_param, filter);
+         const auto* result_ids = search_result->GetIds();
+diff --git a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+index 97c72238..7d3d5b50 100644
+--- a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
++++ b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+@@ -102,7 +102,7 @@ IVFNearestPartition::ClassifyDatas(const void* datas,
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max(int64_t{10}, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result =
+             this->route_index_ptr_->KnnSearch(query, buckets_per_data, search_param, filter);
+diff --git a/src/algorithm/pyramid.cpp b/src/algorithm/pyramid.cpp
+index c8a28175..82de2bad 100644
+--- a/src/algorithm/pyramid.cpp
++++ b/src/algorithm/pyramid.cpp
+@@ -249,7 +249,7 @@ Pyramid::KnnSearch(const DatasetPtr& query,
+     QueryContext ctx{.stats = &stats};
+ 
+     auto parsed_param = PyramidSearchParameters::FromJson(parameters);
+-    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, int64_t{1000});
+     CHECK_ARGUMENT(  // NOLINT
+         (1 <= parsed_param.ef_search) and (parsed_param.ef_search <= ef_search_threshold),
+         fmt::format(
 diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
 index 09a119b5..0b6fe127 100644
 --- a/src/impl/allocator/default_allocator.cpp
@@ -800,6 +870,41 @@ index 9b023fc0..f625d269 100644
          ordered_buffer_[pos] = record;
          cur_size_++;
      }
+diff --git a/src/index/hnsw.cpp b/src/index/hnsw.cpp
+index 769f3bee..773e1705 100644
+--- a/src/index/hnsw.cpp
++++ b/src/index/hnsw.cpp
+@@ -282,7 +282,7 @@ HNSW::knn_search(const DatasetPtr& query,
+ 
+         // check search parameters
+         auto params = HnswSearchParameters::FromJson(parameters);
+-        auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++        auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, int64_t{1000});
+         CHECK_ARGUMENT(  // NOLINT
+             (1 <= params.ef_search) and (params.ef_search <= ef_search_threshold),
+             fmt::format(
+diff --git a/src/index/hnsw_zparameters.cpp b/src/index/hnsw_zparameters.cpp
+index 0b158fab..9c865e05 100644
+--- a/src/index/hnsw_zparameters.cpp
++++ b/src/index/hnsw_zparameters.cpp
+@@ -58,7 +58,7 @@ HnswParameters::FromJson(const JsonType& hnsw_param_obj,
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_M].IsNumberInteger(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_M));
+     obj.max_degree = hnsw_param_obj[HNSW_PARAMETER_M].GetInt();
+-    auto max_degree_threshold = std::max(index_common_param.dim_, 128L);
++    auto max_degree_threshold = std::max(index_common_param.dim_, int64_t{128});
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= obj.max_degree) and (obj.max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", obj.max_degree, max_degree_threshold));
+@@ -70,7 +70,7 @@ HnswParameters::FromJson(const JsonType& hnsw_param_obj,
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION].IsNumberInteger(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_CONSTRUCTION));
+     obj.ef_construction = hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION].GetInt();
+-    auto construction_threshold = std::max(1000L, AMPLIFICATION_FACTOR * obj.max_degree);
++    auto construction_threshold = std::max(int64_t{1000}, AMPLIFICATION_FACTOR * obj.max_degree);
+     CHECK_ARGUMENT((obj.max_degree <= obj.ef_construction) and  // NOLINT
+                        (obj.ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
 diff --git a/src/index/index_impl_test.cpp b/src/index/index_impl_test.cpp
 index a813735f..91d47f78 100644
 --- a/src/index/index_impl_test.cpp
