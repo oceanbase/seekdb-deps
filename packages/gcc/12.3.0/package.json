@@ -49,11 +49,11 @@
   },
   "required_artifacts": {
     "default": [
-      "usr/local/oceanbase/devtools/include/c++/12/vector",
-      "usr/local/oceanbase/devtools/lib64/libstdc++.a",
-      "usr/local/oceanbase/devtools/lib64/libstdc++.so.6.0.30",
-      "usr/local/oceanbase/devtools/lib64/libgcc_s.so.1",
-      "usr/local/oceanbase/devtools/lib64/libatomic.a"
+      "devtools/include/c++/12/vector",
+      "devtools/lib64/libstdc++.a",
+      "devtools/lib64/libstdc++.so.6.0.30",
+      "devtools/lib64/libgcc_s.so.1",
+      "devtools/lib64/libatomic.a"
     ]
   }
 }

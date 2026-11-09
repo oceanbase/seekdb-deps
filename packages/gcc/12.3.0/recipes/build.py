@@ -5,7 +5,7 @@ import shutil
 import subprocess
 
 
-PREFIX = Path("usr/local/oceanbase/devtools")
+PREFIX = Path("devtools")
 
 
 def _copy(source, destination):
