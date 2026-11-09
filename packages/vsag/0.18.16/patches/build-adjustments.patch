@@ -403,7 +403,7 @@ index e6c58466..dd4b0233 100644
  
  #else
 diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
-index c86c1baf..2ca81764 100644
+index c86c1baf..125bb88f 100644
 --- a/extern/diskann/DiskANN/src/disk_utils.cpp
 +++ b/extern/diskann/DiskANN/src/disk_utils.cpp
 @@ -25,7 +25,7 @@ namespace diskann
@@ -415,6 +415,24 @@ index c86c1baf..2ca81764 100644
      diskann::load_bin<uint64_t>(index_file, metadata, nr, nc);
      if (nc != 1)
      {
+@@ -419,7 +419,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+         {
+             // Gopal. random_shuffle() is deprecated.
+             std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-            nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++            nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+             // write into merged ofstream
+             merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+             merged_vamana_writer.write((char *)final_nhood.data(), nnbrs * sizeof(uint32_t));
+@@ -458,7 +458,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+ 
+     // Gopal. random_shuffle() is deprecated.
+     std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-    nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++    nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+     // write into merged ofstream
+     merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+     if (nnbrs > 0)
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
