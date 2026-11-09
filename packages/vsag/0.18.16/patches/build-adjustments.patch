@@ -402,6 +402,19 @@ index e6c58466..dd4b0233 100644
  #endif
  
  #else
+diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
+index c86c1baf..2ca81764 100644
+--- a/extern/diskann/DiskANN/src/disk_utils.cpp
++++ b/extern/diskann/DiskANN/src/disk_utils.cpp
+@@ -25,7 +25,7 @@ namespace diskann
+ void add_new_file_to_single_index(std::string index_file, std::string new_file)
+ {
+     std::unique_ptr<uint64_t[]> metadata;
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     diskann::load_bin<uint64_t>(index_file, metadata, nr, nc);
+     if (nc != 1)
+     {
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
