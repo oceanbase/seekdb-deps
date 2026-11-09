@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
 
 
 FETCHCONTENT_SOURCES = {
@@ -97,7 +98,13 @@ def build(ctx):
             raise ValueError("Pinned VSAG dependency source is missing: " + str(source))
         options["FETCHCONTENT_SOURCE_DIR_" + content_name] = str(source)
 
-    ctx.cmake(options=options, targets=("vsag_static", "fmt"))
+    try:
+        ctx.cmake(options=options, targets=("vsag_static", "fmt"))
+    except subprocess.CalledProcessError:
+        for log in sorted((ctx.build_dir / "cmake/openblas/src/openblas-stamp").glob("openblas-build-*.log")):
+            print("OpenBLAS build log: " + str(log), file=sys.stderr)
+            print(log.read_text(errors="replace")[-16000:], file=sys.stderr)
+        raise
 
     for header in sorted((ctx.source_dir / "include/vsag").iterdir()):
         if header.is_file():
