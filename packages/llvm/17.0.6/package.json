@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "name": "llvm",
+  "version": "17.0.6",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/llvm/llvm-project/tar.gz/refs/tags/llvmorg-17.0.6",
+    "repository": "https://github.com/llvm/llvm-project.git",
+    "tag": "llvmorg-17.0.6",
+    "revision": "6009708b4367171ccdbf4b5905cb6a803753fe18",
+    "archive_sha256": "81494d32e6f12ea6f73d6d25424dbd2364646011bb8f7e345ca870750aa27de1",
+    "strip_prefix": "llvm-project-llvmorg-17.0.6"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Apache-2.0 WITH LLVM-exception",
+    "source_path": "LICENSE.TXT"
+  },
+  "required_artifacts": {
+    "default": [
+      "bin/clang",
+      "bin/clang++",
+      "bin/lld",
+      "bin/ld.lld",
+      "bin/llvm-ar",
+      "bin/llvm-cov",
+      "bin/llvm-cxxfilt",
+      "bin/llvm-dwp",
+      "bin/llvm-nm",
+      "bin/llvm-objcopy",
+      "bin/llvm-objdump",
+      "bin/llvm-ranlib",
+      "bin/llvm-strip",
+      "lib/libLLVM-17.so",
+      "lib/clang/17/include/stddef.h"
+    ]
+  }
+}
