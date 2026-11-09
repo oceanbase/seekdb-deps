@@ -129,14 +129,19 @@ jobs:
           create-args: >-
             -c conda-forge --strict-channel-priority
             python=3.11 cmake ninja
-            gcc_linux-${{ matrix.target.conda_arch }}=12
-            gxx_linux-${{ matrix.target.conda_arch }}=12
-            ${{ inputs.package == 'vsag' && format('gfortran_linux-{0}=12', matrix.target.conda_arch) || '' }}
+            gcc_linux-${{ matrix.target.conda_arch }}=${{ matrix.target.compiler_version }}
+            gxx_linux-${{ matrix.target.conda_arch }}=${{ matrix.target.compiler_version }}
+            ${{ matrix.target.conda_extra }}
             sysroot_linux-${{ matrix.target.conda_arch }}=2.17
 
-      - name: Install VSAG build headers
-        if: ${{ matrix.target.family == 'linux' && inputs.package == 'vsag' }}
-        run: sudo apt-get update && sudo apt-get install -y libaio-dev
+      - name: Install Linux system build dependencies
+        if: ${{ matrix.target.family == 'linux' && matrix.target.system_packages != '' }}
+        env:
+          SYSTEM_PACKAGES: ${{ matrix.target.system_packages }}
+        run: |
+          read -r -a packages <<< "$SYSTEM_PACKAGES"
+          sudo apt-get update
+          sudo apt-get install -y -- "${packages[@]}"
 
       - uses: actions/setup-java@v6
         if: ${{ matrix.target.family == 'android' }}

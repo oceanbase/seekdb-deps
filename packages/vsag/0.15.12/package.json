@@ -6,6 +6,12 @@
     "linux-x86_64-glibc217",
     "linux-aarch64-glibc217"
   ],
+  "build_dependencies": {
+    "linux": {
+      "compilers": ["fortran"],
+      "system_packages": ["libaio-dev"]
+    }
+  },
   "source": {
     "path": "source",
     "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.15.12",
