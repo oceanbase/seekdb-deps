@@ -1,147 +1,3 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a8f90103..ac08a314 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -86,14 +86,22 @@ else ()
- endif ()
- 
- if (ENABLE_WERROR)
--    add_compile_options (-Werror)
-+    if (MSVC)
-+        add_compile_options (/WX)
-+    else ()
-+        add_compile_options (-Werror)
-+    endif ()
- endif ()
- 
--vsag_add_exe_linker_flag (-static-libstdc++)
--vsag_add_shared_linker_flag (-static-libstdc++)
--vsag_add_shared_linker_flag (-fvisibility=hidden)
-+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-+    vsag_add_exe_linker_flag (-static-libstdc++)
-+    vsag_add_shared_linker_flag (-static-libstdc++)
-+endif ()
-+if (NOT WIN32)
-+    vsag_add_shared_linker_flag (-fvisibility=hidden)
-+endif ()
- 
--if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT WIN32)
-     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -gdwarf-4")
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-4")
- 
-@@ -128,7 +136,7 @@ if (ENABLE_LIBCXX)
-         message (FATAL_ERROR "libc++ or libc++abi not found")
-     endif ()
- else ()
--    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
-     endif ()
- endif ()
-@@ -161,8 +169,10 @@ if (CCACHE_FOUND AND ENABLE_CCACHE)
-     set_property (GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
- endif ()
- 
--set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
--set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-+if (NOT WIN32)
-+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-+endif ()
- 
- set (ld_flags
-         "-L${CMAKE_INSTALL_PREFIX}/lib"
-@@ -188,20 +198,31 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
- endif ()
- string (JOIN " " ld_flags ${ld_flags})
- 
--set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
--set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-+if (NOT WIN32)
-+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-+endif ()
- 
- set (common_cmake_args
-         "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
-         "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-         "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
--        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
--        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
-+        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
-+        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
-         "-DCMAKE_EXE_LINKER_FLAGS=${extra_link_libs}"
-         "-DCMAKE_SHARED_LINKER_FLAGS=${extra_link_libs}"
-         "-DCMAKE_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include"
-         "-DCMAKE_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib:/opt/alibaba-cloud-compiler/lib64"
- )
-+if (CMAKE_TOOLCHAIN_FILE)
-+    list (APPEND common_cmake_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
-+endif ()
-+if (ANDROID)
-+    list (APPEND common_cmake_args
-+        "-DANDROID_ABI=${ANDROID_ABI}"
-+        "-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
-+        "-DANDROID_NDK=${ANDROID_NDK}")
-+endif ()
- 
- set (common_configure_envs
-         "env"
-@@ -230,7 +251,9 @@ include (extern/openblas/openblas.cmake)
- include (extern/mkl/mkl.cmake)
- include (extern/diskann/diskann.cmake)
- include (extern/spdlog/spdlog.cmake)
--include (extern/catch2/catch2.cmake)
-+if (ENABLE_TESTS)
-+    include (extern/catch2/catch2.cmake)
-+endif ()
- include (extern/cpuinfo/cpuinfo.cmake)
- include (extern/fmt/fmt.cmake)
- include (extern/thread_pool/thread_pool.cmake)
-@@ -260,12 +283,14 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
- endif ()
- 
- # debug or release or sanitize
--set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
--if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-+if (NOT MSVC)
-+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
-+endif ()
-+if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
--elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
--    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
--elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize")
-+elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
-+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
-+elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize" AND NOT MSVC)
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
- endif ()
- 
-@@ -319,7 +344,9 @@ endif ()
- 
- # sources
- add_subdirectory (src)
--add_subdirectory (mockimpl)
-+if (ENABLE_TESTS)
-+    add_subdirectory (mockimpl)
-+endif ()
- if (ENABLE_EXAMPLES)
-     add_subdirectory (examples/cpp)
- endif ()
-@@ -374,9 +401,10 @@ endif ()
- # version
- find_package (Git)
- add_custom_target (version
--        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
-+        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.0 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
-         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
-         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
-         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
- )
- add_dependencies (vsag version)
-+add_dependencies (vsag_static version)
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
 index 95e07446..f5f7feae 100644
 --- a/extern/antlr4/antlr4.cmake
@@ -490,6 +346,97 @@ index 10075a1c..e6cededc 100644
  
  add_library (simd STATIC ${SIMD_SRCS})
  
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a8f90103..c1693a41 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -89 +89,5 @@ if (ENABLE_WERROR)
+-    add_compile_options (-Werror)
++    if (MSVC)
++        add_compile_options (/WX)
++    else ()
++        add_compile_options (-Werror)
++    endif ()
+@@ -92,3 +96,7 @@ endif ()
+-vsag_add_exe_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-fvisibility=hidden)
++if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
++    vsag_add_exe_linker_flag (-static-libstdc++)
++    vsag_add_shared_linker_flag (-static-libstdc++)
++endif ()
++if (NOT WIN32)
++    vsag_add_shared_linker_flag (-fvisibility=hidden)
++endif ()
+@@ -96 +104 @@ vsag_add_shared_linker_flag (-fvisibility=hidden)
+-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT WIN32)
+@@ -131 +139 @@ else ()
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+@@ -164,2 +172,4 @@ endif ()
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+@@ -191,2 +201,4 @@ string (JOIN " " ld_flags ${ld_flags})
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+@@ -198,2 +210,2 @@ set (common_cmake_args
+-        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
+-        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
++        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
++        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
+@@ -204,0 +217,9 @@ set (common_cmake_args
++if (CMAKE_TOOLCHAIN_FILE)
++    list (APPEND common_cmake_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
++endif ()
++if (ANDROID)
++    list (APPEND common_cmake_args
++        "-DANDROID_ABI=${ANDROID_ABI}"
++        "-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
++        "-DANDROID_NDK=${ANDROID_NDK}")
++endif ()
+@@ -233 +254,3 @@ include (extern/spdlog/spdlog.cmake)
+-include (extern/catch2/catch2.cmake)
++if (ENABLE_TESTS)
++    include (extern/catch2/catch2.cmake)
++endif ()
+@@ -256,0 +280,4 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    if (APPLE)
++        # Boost 1.67 uses a pragma that newer Clang diagnoses under -Werror.
++        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pragma-clang-attribute")
++    endif ()
+@@ -263,2 +290,4 @@ endif ()
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
+-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
++if (NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
++endif ()
++if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
+@@ -266,3 +295,3 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize" AND NOT MSVC)
+@@ -322 +351,3 @@ add_subdirectory (src)
+-add_subdirectory (mockimpl)
++if (ENABLE_TESTS)
++    add_subdirectory (mockimpl)
++endif ()
+@@ -377 +408 @@ add_custom_target (version
+-        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
++        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.0 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+@@ -382,0 +414 @@ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
 diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
 index 199731c2..79b4aa82 100644
 --- a/src/io/CMakeLists.txt
