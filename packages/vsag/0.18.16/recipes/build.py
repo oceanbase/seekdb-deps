@@ -12,7 +12,10 @@ import sys
 LIBOMP_VERSION = "23.1.5"
 LIBOMP_SOURCE_SHA256 = "fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e"
 WINDOWS_LIBOMP_VERSION = "18.1.8"
-WINDOWS_LIBOMP_SOURCE_SHA256 = "0b58557a6d32ceee97c8d533a59b9212d87e0fc4d2833924eb6c611247db2f2a"
+WINDOWS_LIBOMP_SOURCE_SHA256 = {
+    "openmp": "60ed57245e73894e4a2a89b15889f367bd906abfe6d3f92e1718223d4b496150",
+    "cmake": "59badef592dd34893cd319d42b323aaa990b452d05c7180ff20f23ab1b41e837",
+}
 
 
 LIBRARIES = {
@@ -117,19 +120,21 @@ def _build_macos_openmp(ctx):
 
 
 def _build_windows_openmp(ctx):
-    archive = ctx.build_dir / ("llvm-project-" + WINDOWS_LIBOMP_VERSION + ".src.tar.xz")
-    url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-"
-           + WINDOWS_LIBOMP_VERSION + "/" + archive.name)
-    ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
-    with archive.open("rb") as input_file:
-        actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
-    if actual_sha256 != WINDOWS_LIBOMP_SOURCE_SHA256:
-        raise ValueError("LLVM OpenMP source SHA256 mismatch: " + actual_sha256)
+    for component, expected_sha256 in WINDOWS_LIBOMP_SOURCE_SHA256.items():
+        archive = ctx.build_dir / (component + "-" + WINDOWS_LIBOMP_VERSION + ".src.tar.xz")
+        url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-"
+               + WINDOWS_LIBOMP_VERSION + "/" + archive.name)
+        ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
+        with archive.open("rb") as input_file:
+            actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+        if actual_sha256 != expected_sha256:
+            raise ValueError("LLVM " + component + " source SHA256 mismatch: " + actual_sha256)
+        ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir])
 
-    source_root = "llvm-project-" + WINDOWS_LIBOMP_VERSION + ".src"
-    ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir,
-             source_root + "/openmp", source_root + "/cmake"])
-    source_dir = ctx.build_dir / source_root / "openmp"
+    (ctx.build_dir / ("cmake-" + WINDOWS_LIBOMP_VERSION + ".src")).rename(
+        ctx.build_dir / "cmake"
+    )
+    source_dir = ctx.build_dir / ("openmp-" + WINDOWS_LIBOMP_VERSION + ".src")
     build_dir = ctx.build_dir / "openmp-windows-build"
     ctx.run([
         "cmake", "-S", source_dir, "-B", build_dir, "-G", "Ninja",
