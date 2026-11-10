@@ -31,6 +31,7 @@ TARGETS = [
     },
     {"id": "macos-arm64-min13", "family": "macos", "runner": "macos-15"},
     {"id": "windows-x86_64-md", "family": "windows", "runner": "windows-2022"},
+    {"id": "windows-x86_64-mt", "family": "windows", "runner": "windows-2022"},
     {"id": "android-arm64-v8a-api26", "family": "android", "runner": "ubuntu-24.04"},
 ]
 

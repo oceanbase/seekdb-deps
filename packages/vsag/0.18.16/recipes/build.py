@@ -11,6 +11,8 @@ import sys
 
 LIBOMP_VERSION = "23.1.5"
 LIBOMP_SOURCE_SHA256 = "fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e"
+WINDOWS_LIBOMP_VERSION = "18.1.8"
+WINDOWS_LIBOMP_SOURCE_SHA256 = "0b58557a6d32ceee97c8d533a59b9212d87e0fc4d2833924eb6c611247db2f2a"
 
 
 LIBRARIES = {
@@ -114,6 +116,43 @@ def _build_macos_openmp(ctx):
     return libraries[0]
 
 
+def _build_windows_openmp(ctx):
+    archive = ctx.build_dir / ("llvm-project-" + WINDOWS_LIBOMP_VERSION + ".src.tar.xz")
+    url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-"
+           + WINDOWS_LIBOMP_VERSION + "/" + archive.name)
+    ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
+    with archive.open("rb") as input_file:
+        actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+    if actual_sha256 != WINDOWS_LIBOMP_SOURCE_SHA256:
+        raise ValueError("LLVM OpenMP source SHA256 mismatch: " + actual_sha256)
+
+    source_root = "llvm-project-" + WINDOWS_LIBOMP_VERSION + ".src"
+    ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir,
+             source_root + "/openmp", source_root + "/cmake"])
+    source_dir = ctx.build_dir / source_root / "openmp"
+    build_dir = ctx.build_dir / "openmp-windows-build"
+    ctx.run([
+        "cmake", "-S", source_dir, "-B", build_dir, "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_C_COMPILER=" + ctx.environment["CC"],
+        "-DCMAKE_CXX_COMPILER=" + ctx.environment["CXX"],
+        "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW",
+        "-DCMAKE_MSVC_RUNTIME_LIBRARY=" + ctx.target.document["abi"]["runtime_library"],
+        "-DLIBOMP_ENABLE_SHARED=ON",
+        "-DLIBOMP_INSTALL_ALIASES=OFF",
+        "-DOPENMP_ENABLE_LIBOMPTARGET=OFF",
+        "-DOPENMP_ENABLE_OMPT_TOOLS=OFF",
+    ])
+    ctx.run(["cmake", "--build", build_dir, "--parallel", str(ctx.jobs)])
+    libraries = {}
+    for name in ("libomp.lib", "libomp.dll"):
+        matches = list(build_dir.rglob(name))
+        if len(matches) != 1:
+            raise ValueError("Expected one Windows OpenMP " + name + ", found " + str(len(matches)))
+        libraries[name] = matches[0]
+    return libraries
+
+
 def build(ctx):
     if ctx.target.family == "linux":
         libaio_header = Path("/usr/include/libaio.h")
@@ -167,16 +206,9 @@ def build(ctx):
         ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
         ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
     if ctx.target.family == "windows":
-        compiler_root = Path(ctx.environment["CXX"]).resolve().parent.parent
-        for source, destination in (
-            (compiler_root / "lib/libomp.lib", "lib/libomp.lib"),
-            (compiler_root / "bin/libomp.dll", "bin/libomp.dll"),
-        ):
-            if not source.is_file():
-                raise ValueError("Windows LLVM OpenMP runtime is missing: " + str(source))
-            copied = ctx.build_dir / source.name
-            shutil.copy2(source, copied)
-            ctx.install(copied, destination)
+        openmp = _build_windows_openmp(ctx)
+        ctx.install(openmp["libomp.lib"], "lib/libomp.lib")
+        ctx.install(openmp["libomp.dll"], "bin/libomp.dll")
     if ctx.target.family == "android":
         ctx.install(
             _built_library(ctx, ("spdlog/install/lib/libspdlog.a",)),
