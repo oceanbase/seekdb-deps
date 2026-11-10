@@ -1053,6 +1053,15 @@ index 140872e0..5c92b5bd 100644
                      dists.data(), dists.size(), heap, inner_param, window_start_id);
              }
          }
+diff --git a/src/analyzer/hgraph_analyzer.cpp b/src/analyzer/hgraph_analyzer.cpp
+index 4669611e..c21ea9e0 100644
+--- a/src/analyzer/hgraph_analyzer.cpp
++++ b/src/analyzer/hgraph_analyzer.cpp
+@@ -131,3 +131,3 @@
+         const auto* gt_data = groundtruth->GetData();
+-        auto neighbor_count = std::min(neighbors.size(), groundtruth->Size());
++        auto neighbor_count = std::min<size_t>(neighbors.size(), groundtruth->Size());
+         for (uint32_t i = 0; i < neighbor_count; ++i) {
 diff --git a/src/datacell/sparse_term_datacell.cpp b/src/datacell/sparse_term_datacell.cpp
 index 872df25b..aca3ceda 100644
 --- a/src/datacell/sparse_term_datacell.cpp
