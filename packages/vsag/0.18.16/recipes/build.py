@@ -1,10 +1,16 @@
 """Build VSAG and stage the archives used by seekdb on each platform."""
 
 from pathlib import Path
+import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
+
+
+LIBOMP_VERSION = "23.1.5"
+LIBOMP_SOURCE_SHA256 = "fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e"
 
 
 LIBRARIES = {
@@ -64,6 +70,50 @@ def _compiler_library(ctx, compiler, name):
     return Path(path)
 
 
+def _build_macos_openmp(ctx):
+    archive = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src.tar.xz")
+    url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
+           + "/" + archive.name)
+    ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
+    with archive.open("rb") as input_file:
+        actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+    if actual_sha256 != LIBOMP_SOURCE_SHA256:
+        raise ValueError("LLVM OpenMP source SHA256 mismatch: " + actual_sha256)
+
+    ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir])
+    source_dir = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src/runtimes")
+    build_dir = ctx.build_dir / "openmp-static-build"
+    ctx.run([
+        "cmake", "-S", source_dir, "-B", build_dir, "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_C_COMPILER=" + ctx.environment["CC"],
+        "-DCMAKE_CXX_COMPILER=" + ctx.environment["CXX"],
+        "-DCMAKE_OSX_ARCHITECTURES=" + ctx.target.architecture,
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + ctx.target.document["abi"]["minimum_os_version"],
+        "-DLLVM_ENABLE_RUNTIMES=openmp",
+        "-DLIBOMP_ENABLE_SHARED=OFF",
+        "-DLIBOMP_INSTALL_ALIASES=OFF",
+        "-DOPENMP_ENABLE_LIBOMPTARGET=OFF",
+        "-DOPENMP_ENABLE_OMPT_TOOLS=OFF",
+    ])
+    ctx.run(["cmake", "--build", build_dir, "--parallel", str(ctx.jobs)])
+    libraries = list(build_dir.rglob("libomp.a"))
+    if len(libraries) != 1:
+        raise ValueError("Expected one macOS static OpenMP library, found " + str(len(libraries)))
+    readobj = Path(ctx.environment["CXX"]).resolve().parent / "llvm-readobj"
+    metadata = subprocess.check_output(
+        [str(readobj), "--macho-version-min", str(libraries[0])],
+        env=ctx.environment, text=True,
+    )
+    minimum_versions = re.findall(r"\bVersion: (\d+)\.(\d+)\b", metadata)
+    target_version = tuple(map(int, ctx.target.document["abi"]["minimum_os_version"].split(".")))
+    if not minimum_versions or any(
+        tuple(map(int, version)) > target_version for version in minimum_versions
+    ):
+        raise ValueError("Static OpenMP library exceeds macOS deployment target")
+    return libraries[0]
+
+
 def build(ctx):
     if ctx.target.family == "linux":
         libaio_header = Path("/usr/include/libaio.h")
@@ -115,15 +165,7 @@ def build(ctx):
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "macos":
         ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
-        libomp_prefix = Path(subprocess.check_output(
-            ["brew", "--prefix", "libomp"], env=ctx.environment, text=True,
-        ).strip())
-        libomp_archive = libomp_prefix / "lib/libomp.a"
-        if not libomp_archive.is_file():
-            raise ValueError("Homebrew libomp is missing its static archive: " + str(libomp_archive))
-        libomp_copy = ctx.build_dir / "libomp_static.a"
-        shutil.copy2(libomp_archive, libomp_copy)
-        ctx.install(libomp_copy, "lib/libomp_static.a")
+        ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
     if ctx.target.family == "windows":
         compiler_root = Path(ctx.environment["CXX"]).resolve().parent.parent
         for source, destination in (
