@@ -115,6 +115,26 @@ def build(ctx):
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "macos":
         ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
+        libomp_prefix = Path(subprocess.check_output(
+            ["brew", "--prefix", "libomp"], env=ctx.environment, text=True,
+        ).strip())
+        libomp_archive = libomp_prefix / "lib/libomp.a"
+        if not libomp_archive.is_file():
+            raise ValueError("Homebrew libomp is missing its static archive: " + str(libomp_archive))
+        libomp_copy = ctx.build_dir / "libomp_static.a"
+        shutil.copy2(libomp_archive, libomp_copy)
+        ctx.install(libomp_copy, "lib/libomp_static.a")
+    if ctx.target.family == "windows":
+        compiler_root = Path(ctx.environment["CXX"]).resolve().parent.parent
+        for source, destination in (
+            (compiler_root / "lib/libomp.lib", "lib/libomp.lib"),
+            (compiler_root / "bin/libomp.dll", "bin/libomp.dll"),
+        ):
+            if not source.is_file():
+                raise ValueError("Windows LLVM OpenMP runtime is missing: " + str(source))
+            copied = ctx.build_dir / source.name
+            shutil.copy2(source, copied)
+            ctx.install(copied, destination)
     if ctx.target.family == "android":
         ctx.install(
             _built_library(ctx, ("spdlog/install/lib/libspdlog.a",)),
@@ -144,6 +164,12 @@ def build(ctx):
             staged_license = ctx.build_dir / name
             shutil.copyfile(license_directory / name, staged_license)
             ctx.install(staged_license, "share/licenses/vsag/third-party/gcc/" + name)
+
+    if ctx.target.family in ("macos", "windows"):
+        libomp_license = Path(__file__).resolve().parents[1] / "licenses/LIBOMP-LICENSE.TXT"
+        staged_license = ctx.build_dir / "LIBOMP-LICENSE.TXT"
+        shutil.copyfile(libomp_license, staged_license)
+        ctx.install(staged_license, "share/licenses/vsag/third-party/libomp/LICENSE.TXT")
 
     for dependency, (source_path, licenses) in THIRD_PARTY_LICENSES.items():
         for relative in licenses:

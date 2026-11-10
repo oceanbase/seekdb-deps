@@ -51,6 +51,7 @@
       "lib/libvsag_static.a",
       "lib/libsimd.a",
       "lib/libio.a",
+      "lib/libomp_static.a",
       "lib/libcpuinfo.a",
       "lib/libdiskann.a",
       "lib/libopenblas.a",
@@ -65,6 +66,8 @@
       "lib/cpuinfo.lib",
       "lib/diskann.lib",
       "lib/openblas.lib",
+      "lib/libomp.lib",
+      "bin/libomp.dll",
       "lib/antlr4-runtime-static.lib",
       "lib/antlr4-autogen.lib",
       "lib/fmt.lib"

@@ -187,7 +187,7 @@ index b0571140..1fc3415f 100644
          BUILD_IN_SOURCE 0
          CONFIGURE_COMMAND
 -        cmake ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
-+        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_STATIC_CRT=OFF -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
          BUILD_COMMAND
          cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
          INSTALL_COMMAND cmake --install build
