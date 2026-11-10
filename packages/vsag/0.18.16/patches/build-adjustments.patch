@@ -1742,6 +1742,13 @@ index 15ae4ee7..1e021066 100644
      }
      this->code_size_ = 0;
  
+diff --git a/src/reader.cpp b/src/reader.cpp
+index 9fe1310f..4d729631 100644
+--- a/src/reader.cpp
++++ b/src/reader.cpp
+@@ -1 +1,2 @@
++#include <atomic>
+ #include <fmt/format.h>
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 10075a1c..0ca45017 100644
 --- a/src/simd/CMakeLists.txt
