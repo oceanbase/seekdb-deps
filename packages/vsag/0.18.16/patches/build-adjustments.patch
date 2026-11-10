@@ -563,6 +563,15 @@ index 9244715e..ee603359 100644
  #include <math_utils.h>
  // #include <mkl.h>
  #include <cblas.h>
+diff --git a/extern/diskann/DiskANN/src/partition.cpp b/extern/diskann/DiskANN/src/partition.cpp
+index 155db16b..60996ef2 100644
+--- a/extern/diskann/DiskANN/src/partition.cpp
++++ b/extern/diskann/DiskANN/src/partition.cpp
+@@ -474,3 +474,3 @@
+     uint32_t *shard_ids;
+-    uint64_t shard_size, tmp;
++    size_t shard_size, tmp;
+     diskann::load_bin<uint32_t>(idmap_filename, shard_ids, shard_size, tmp);
 diff --git a/extern/diskann/DiskANN/src/pq.cpp b/extern/diskann/DiskANN/src/pq.cpp
 index 920abad3..35c29ecf 100644
 --- a/extern/diskann/DiskANN/src/pq.cpp
@@ -586,12 +595,10 @@ index 920abad3..35c29ecf 100644
      std::unique_ptr<size_t[]> file_offset_data;
      diskann::load_bin<size_t>(pq_table, reinterpret_cast<size_t *&>(file_offset_data), nr, nc);
 diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
-index 0feeb2fe..a2af65dc 100644
+index 0feeb2fe..24d3055f 100644
 --- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
 +++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
-@@ -10,11 +10,7 @@
- #include "pq_flash_index.h"
- #include "cosine_similarity.h"
+@@ -12,7 +12,3 @@
  
 -#ifdef _WINDOWS
 -#include "windows_aligned_file_reader.h"
@@ -599,26 +606,31 @@ index 0feeb2fe..a2af65dc 100644
  #include "local_file_reader.h"
 -#endif
  
- #define READ_U64(stream, val) stream.read((char *)&val, sizeof(uint64_t))
- #define READ_U32(stream, val) stream.read((char *)&val, sizeof(uint32_t))
-@@ -1038,7 +1034,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
-     size_t pq_file_dim, pq_file_num_centroids;
+@@ -214,3 +210,3 @@
  
- 
--    uint64_t nrow, ncol;
-+    size_t nrow, ncol;
-     std::unique_ptr<size_t[]> file_offset_data;
-     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
-     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
-@@ -1309,7 +1305,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(std::stringstream &pivots_
- 
-     size_t pq_file_dim, pq_file_num_centroids;
+-    uint64_t sample_num, sample_dim, sample_aligned_dim;
++    size_t sample_num, sample_dim, sample_aligned_dim;
+     T *samples;
+@@ -1011,3 +1007,3 @@
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+@@ -1040,3 +1036,3 @@
  
 -    uint64_t nrow, ncol;
 +    size_t nrow, ncol;
      std::unique_ptr<size_t[]> file_offset_data;
-     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
-     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
+@@ -1291,3 +1287,3 @@
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+@@ -1311,3 +1307,3 @@
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index c1ed55f8..25bd4c85 100644
 --- a/extern/diskann/diskann.cmake
