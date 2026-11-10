@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 
 
 LIBOMP_VERSION = "23.1.5"
@@ -129,7 +130,8 @@ def _build_windows_openmp(ctx):
             actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
         if actual_sha256 != expected_sha256:
             raise ValueError("LLVM " + component + " source SHA256 mismatch: " + actual_sha256)
-        ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir])
+        with tarfile.open(archive, "r:xz") as source:
+            source.extractall(ctx.build_dir)
 
     (ctx.build_dir / ("cmake-" + WINDOWS_LIBOMP_VERSION + ".src")).rename(
         ctx.build_dir / "cmake"
