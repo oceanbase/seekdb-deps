@@ -595,7 +595,7 @@ index 920abad3..35c29ecf 100644
      std::unique_ptr<size_t[]> file_offset_data;
      diskann::load_bin<size_t>(pq_table, reinterpret_cast<size_t *&>(file_offset_data), nr, nc);
 diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
-index 0feeb2fe..43bdf847 100644
+index 0feeb2fe..77b5a7ac 100644
 --- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
 +++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
 @@ -12,7 +12,3 @@
@@ -616,6 +616,12 @@ index 0feeb2fe..43bdf847 100644
 -    num_nodes_to_cache = std::min(num_nodes_to_cache, this->node_visit_counter.size());
 +    num_nodes_to_cache = std::min<uint64_t>(num_nodes_to_cache, this->node_visit_counter.size());
      node_list.reserve(num_nodes_to_cache);
+@@ -342,3 +338,3 @@
+-        uint64_t BLOCK_SIZE = 1024;
+-        uint64_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
++        size_t BLOCK_SIZE = 1024;
++        size_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
+         for (size_t block = 0; block < nblocks && !finish_flag; block++)
 @@ -1011,3 +1007,3 @@
      {
 -        uint64_t dumr, dumc;
