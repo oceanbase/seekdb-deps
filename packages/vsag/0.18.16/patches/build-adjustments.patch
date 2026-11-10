@@ -403,10 +403,10 @@ index e6c58466..dd4b0233 100644
  
  #else
 diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
-index c86c1baf..d4029c69 100644
+index c86c1baf..24f62bd4 100644
 --- a/extern/diskann/DiskANN/src/disk_utils.cpp
 +++ b/extern/diskann/DiskANN/src/disk_utils.cpp
-@@ -25,7 +25,7 @@ namespace diskann
+@@ -25,7 +25,7 @@
  void add_new_file_to_single_index(std::string index_file, std::string new_file)
  {
      std::unique_ptr<uint64_t[]> metadata;
@@ -415,7 +415,39 @@ index c86c1baf..d4029c69 100644
      diskann::load_bin<uint64_t>(index_file, metadata, nr, nc);
      if (nc != 1)
      {
-@@ -419,7 +419,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+@@ -160,11 +160,13 @@
+                uint64_t warmup_dim, uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (files.fileExists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         diskann::cout << "In the warmup file: " << cache_warmup_file << " File dim: " << file_dim
+                       << " File aligned dim: " << file_aligned_dim << " Expected dim: " << warmup_dim
+                       << " Expected aligned dim: " << warmup_aligned_dim << std::endl;
+@@ -192,11 +194,13 @@
+                uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (file_exists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         if (file_dim != warmup_dim || file_aligned_dim != warmup_aligned_dim)
+         {
+             std::stringstream stream;
+@@ -419,7 +423,7 @@
          {
              // Gopal. random_shuffle() is deprecated.
              std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
@@ -424,7 +456,7 @@ index c86c1baf..d4029c69 100644
              // write into merged ofstream
              merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
              merged_vamana_writer.write((char *)final_nhood.data(), nnbrs * sizeof(uint32_t));
-@@ -458,7 +458,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+@@ -458,7 +462,7 @@
  
      // Gopal. random_shuffle() is deprecated.
      std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
@@ -433,7 +465,7 @@ index c86c1baf..d4029c69 100644
      // write into merged ofstream
      merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
      if (nnbrs > 0)
-@@ -495,7 +495,7 @@ void breakup_dense_points(const std::string data_file, const std::string labels_
+@@ -495,7 +499,7 @@
      std::string token, line;
      std::ifstream labels_stream(labels_file);
      T *data;
@@ -442,7 +474,7 @@ index c86c1baf..d4029c69 100644
      diskann::load_bin<T>(data_file, data, npts, ndims);
  
      std::unordered_map<uint32_t, uint32_t> dummy_pt_ids;
-@@ -580,7 +580,7 @@ void extract_shard_labels(const std::string &in_label_file, const std::string &s
+@@ -580,7 +584,7 @@
      diskann::cout << "Extracting labels for shard" << std::endl;
  
      uint32_t *ids = nullptr;
@@ -451,10 +483,15 @@ index c86c1baf..d4029c69 100644
      diskann::load_bin(shard_ids_bin, ids, num_ids, tmp_dim);
  
      uint32_t counter = 0, shard_counter = 0;
-@@ -697,2 +697,2 @@ int build_disk_index(const std::string &base_file, const std::string &index_pre
+@@ -694,7 +698,7 @@
+         diskann::IndexWriteParameters paras =
+             diskann::IndexWriteParametersBuilder(L, (2 * R / 3)).with_filter_list_size(Lf).build();
+ 
 -        uint64_t shard_base_dim, shard_base_pts;
 +        size_t shard_base_dim, shard_base_pts;
          get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
+         diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts, false, false, false, build_pq_bytes > 0,
+                                  build_pq_bytes, use_opq);
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
