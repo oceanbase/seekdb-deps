@@ -403,7 +403,7 @@ index e6c58466..dd4b0233 100644
  
  #else
 diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
-index c86c1baf..c0a31807 100644
+index c86c1baf..d4029c69 100644
 --- a/extern/diskann/DiskANN/src/disk_utils.cpp
 +++ b/extern/diskann/DiskANN/src/disk_utils.cpp
 @@ -25,7 +25,7 @@ namespace diskann
@@ -451,6 +451,10 @@ index c86c1baf..c0a31807 100644
      diskann::load_bin(shard_ids_bin, ids, num_ids, tmp_dim);
  
      uint32_t counter = 0, shard_counter = 0;
+@@ -697,2 +697,2 @@ int build_disk_index(const std::string &base_file, const std::string &index_pre
+-        uint64_t shard_base_dim, shard_base_pts;
++        size_t shard_base_dim, shard_base_pts;
+         get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
 diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
 index 707bb054..a6c63969 100644
 --- a/extern/diskann/DiskANN/src/distance.cpp
