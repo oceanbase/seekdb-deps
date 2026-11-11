@@ -150,7 +150,13 @@ jobs:
       - name: Install NASM for OpenSSL
         if: ${{ matrix.target.family == 'windows' && inputs.package == 'openssl' }}
         shell: pwsh
-        run: choco install nasm --yes --no-progress
+        run: |
+          choco install nasm --yes --no-progress
+          $nasmDir = Join-Path $env:ProgramFiles 'NASM'
+          if (-not (Test-Path (Join-Path $nasmDir 'nasm.exe'))) {
+            throw "NASM was not installed at $nasmDir"
+          }
+          $nasmDir >> $env:GITHUB_PATH
 
       - uses: mamba-org/setup-micromamba@v3
         if: ${{ matrix.target.family == 'linux' }}
