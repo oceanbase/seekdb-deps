@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import re
+import shutil
 
 
 TARGETS = {
@@ -26,7 +27,11 @@ def build(ctx):
         if re.search(r"/MDd?\b|/MTd\b", ctx.environment.get("CFLAGS", ""), re.I):
             raise ValueError("CFLAGS conflicts with the Windows /MT target")
         # OpenSSL 1.1.1 uses /MT for its static libraries when no-shared is set.
-        build_tool = "nmake"
+        # CreateProcess searches the parent process PATH, not the environment
+        # passed to the child; VS tools are on the initialized child PATH.
+        build_tool = shutil.which("nmake", path=ctx.environment["PATH"])
+        if not build_tool:
+            raise ValueError("nmake was not found in the Visual Studio developer environment")
         libraries = ("libcrypto.lib", "libssl.lib")
     else:
         build_tool = "make"
