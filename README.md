@@ -64,7 +64,7 @@ Profiles describe target ABI, target C flags where applicable, and supported bui
 
 Profiles are build contracts, not validation claims. The zlib 1.4 recipe builds only upstream's `zlibstatic` target and stages the static library and public headers. Linux aarch64, macOS, Windows, and Android profiles have not been built.
 
-The jemalloc 5.3.1 recipe uses the `seekdb-jemalloc-sys` 0.2.3+5.3.1 crate pinned in seekdb's `deps/external/Cargo.lock`. Cargo runs the crate's build script with the `stats` feature and the `je_` API prefix. The binary package contains the generated C/C++ header and native static archive; it does not contain a Rust library. The Linux and Android builds disable jemalloc's initial-exec TLS requirement for embedded-library loading. Windows `/MD` and `/MT` packages are separate target ABIs.
+The jemalloc 5.3.1 recipe uses the `seekdb-jemalloc-sys` 0.2.3+5.3.1 crate pinned in seekdb's `deps/external/Cargo.lock`. Cargo runs the crate's build script with the `stats` feature and the `je_` API prefix. The binary package contains the generated C/C++ header and native static archive; it does not contain a Rust library. The Linux and Android builds disable jemalloc's initial-exec TLS requirement for embedded-library loading. The Windows package uses the static MSVC runtime (`/MT`).
 
 ## Licensing
 
