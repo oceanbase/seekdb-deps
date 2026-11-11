@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "openssl",
+  "version": "1.1.1u",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1u/openssl-1.1.1u.tar.gz",
+    "repository": "https://github.com/openssl/openssl.git",
+    "tag": "OpenSSL_1_1_1u",
+    "revision": "70c2912f635aac8ab28629a2b5ea0c09740d2bda",
+    "archive_sha256": "e2f8d84b523eecd06c7be7626830370300fbcc15386bf5142d72758f6963ebc6",
+    "strip_prefix": "openssl-1.1.1u"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "OpenSSL",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/openssl/crypto.h",
+      "include/openssl/opensslconf.h",
+      "include/openssl/ssl.h",
+      "lib/libcrypto.a",
+      "lib/libssl.a",
+      "share/licenses/openssl/LICENSE"
+    ],
+    "windows": [
+      "include/openssl/crypto.h",
+      "include/openssl/opensslconf.h",
+      "include/openssl/ssl.h",
+      "lib/libcrypto.lib",
+      "lib/libssl.lib",
+      "share/licenses/openssl/LICENSE"
+    ]
+  }
+}
