@@ -1,6 +1,7 @@
 """Build the VSAG version used by seekdb's 1.1.0 Linux RPM."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import sys
@@ -52,6 +53,16 @@ def _compiler_library(ctx, compiler, name):
 
 
 def build(ctx):
+    libaio_header = Path("/usr/include/libaio.h")
+    if not libaio_header.is_file():
+        raise ValueError("VSAG build needs the libaio development header")
+    build_headers = ctx.build_dir / "build-headers"
+    build_headers.mkdir()
+    shutil.copy2(libaio_header, build_headers / "libaio.h")
+    ctx.environment["CPATH"] = os.pathsep.join(
+        value for value in (str(build_headers), ctx.environment.get("CPATH", "")) if value
+    )
+
     try:
         ctx.cmake(options={
             "CMAKE_INSTALL_PREFIX": str(ctx.build_dir / "install"),
