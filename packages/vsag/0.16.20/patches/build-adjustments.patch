@@ -17,3 +17,20 @@ diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
 -        make DYNAMIC_ARCH=1 PREFIX=${install_dir} install
 +        make DYNAMIC_ARCH=1 ${openblas_make_target} PREFIX=${install_dir} install
      BUILD_IN_SOURCE 1
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -316,2 +316,3 @@
+         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
++        -D VSAG_VERSION=v0.16.20
+         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+@@ -320 +321,2 @@
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -1,2 +1,2 @@
+-if(GIT_EXECUTABLE)
++if(GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component(SRC_DIR ${SRC} DIRECTORY)
