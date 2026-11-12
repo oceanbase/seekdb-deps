@@ -193,6 +193,7 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" install 6.0.12
           "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          emcc --version
           echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
           IFS=: read -ra path_entries <<< "$PATH"
           printf '%s\n' "${path_entries[@]}" >> "$GITHUB_PATH"

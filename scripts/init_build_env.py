@@ -343,8 +343,10 @@ def initialize_build_environment(profile):
         compiler = _require_command("emcc", env)
         version_text = _run([compiler, "--version"], env=env, capture=True)
         version = abi["emscripten_version"]
-        if not re.search(r"\b" + re.escape(version) + r"\b", version_text.splitlines()[0]):
-            raise ValueError("WASM target requires Emscripten " + version)
+        if not re.search(r"\b" + re.escape(version) + r"\b", version_text):
+            raise ValueError("WASM target requires Emscripten {}; found {}".format(
+                version, version_text.splitlines()[0]
+            ))
         env["CC"] = compiler
         env["CXX"] = _require_command("em++", env)
         args.extend([
