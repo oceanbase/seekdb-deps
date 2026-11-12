@@ -1466,6 +1466,19 @@ index 85c32ca..2afa243 100644
 -}  // namespace vsag
 \ No newline at end of file
 +}  // namespace vsag
+diff --git a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+index f7a3847..2b98ed9 100644
+--- a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
++++ b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+@@ -31,7 +31,7 @@ SQ8UniformQuantizer<metric>::SQ8UniformQuantizer(int dim, Allocator* allocator)
+     lower_bound_ = std::numeric_limits<DataType>::max();
+     diff_ = std::numeric_limits<DataType>::lowest();
+ 
+-    uint64_t align_size = 1;
++    size_t align_size = 1;
+     if constexpr (metric == MetricType::METRIC_TYPE_L2SQR) {
+         align_size = std::max(align_size, sizeof(norm_type));
+     }
 diff --git a/src/reader.cpp b/src/reader.cpp
 index 9fe1310..93a88ac 100644
 --- a/src/reader.cpp
