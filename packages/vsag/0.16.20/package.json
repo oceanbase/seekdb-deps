@@ -55,10 +55,7 @@
       "lib/libopenblas.a",
       "lib/libantlr4-runtime.a",
       "lib/libantlr4-autogen.a",
-      "lib/libfmt.a",
-      "lib/libgfortran_static.a",
-      "lib/libquadmath_static.a",
-      "lib/libgcc.a"
+      "lib/libfmt.a"
     ],
     "windows": [
       "include/vsag/vsag.h",

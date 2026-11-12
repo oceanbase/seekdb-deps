@@ -76,6 +76,20 @@ def _compiler_library(ctx, compiler, name):
     return Path(path)
 
 
+def _verify_macos_deployment_target(ctx, archive):
+    readobj = Path(ctx.environment["CXX"]).resolve().parent / "llvm-readobj"
+    metadata = subprocess.check_output(
+        [str(readobj), "--macho-version-min", str(archive)],
+        env=ctx.environment, text=True,
+    )
+    minimum_versions = re.findall(r"\bVersion: (\d+)\.(\d+)\b", metadata)
+    target_version = tuple(map(int, ctx.target.document["abi"]["minimum_os_version"].split(".")))
+    if not minimum_versions or any(
+        tuple(map(int, version)) > target_version for version in minimum_versions
+    ):
+        raise ValueError(str(archive) + " exceeds macOS deployment target")
+
+
 def _build_macos_openmp(ctx):
     archive = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src.tar.xz")
     url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
@@ -106,17 +120,7 @@ def _build_macos_openmp(ctx):
     libraries = list(build_dir.rglob("libomp.a"))
     if len(libraries) != 1:
         raise ValueError("Expected one macOS static OpenMP library, found " + str(len(libraries)))
-    readobj = Path(ctx.environment["CXX"]).resolve().parent / "llvm-readobj"
-    metadata = subprocess.check_output(
-        [str(readobj), "--macho-version-min", str(libraries[0])],
-        env=ctx.environment, text=True,
-    )
-    minimum_versions = re.findall(r"\bVersion: (\d+)\.(\d+)\b", metadata)
-    target_version = tuple(map(int, ctx.target.document["abi"]["minimum_os_version"].split(".")))
-    if not minimum_versions or any(
-        tuple(map(int, version)) > target_version for version in minimum_versions
-    ):
-        raise ValueError("Static OpenMP library exceeds macOS deployment target")
+    _verify_macos_deployment_target(ctx, libraries[0])
     return libraries[0]
 
 
@@ -207,22 +211,16 @@ def build(ctx):
     libraries = WINDOWS_LIBRARIES if ctx.target.family == "windows" else LIBRARIES
     staged_libraries = []
     for name, candidates in libraries.items():
-        ctx.install(_built_library(ctx, candidates), "lib/" + name)
+        archive = _built_library(ctx, candidates)
+        if ctx.target.family == "macos":
+            _verify_macos_deployment_target(ctx, archive)
+        ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "macos":
-        ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
+        io_archive = _built_library(ctx, ("src/io/libio.a",))
+        _verify_macos_deployment_target(ctx, io_archive)
+        ctx.install(io_archive, "lib/libio.a")
         ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
-    if ctx.target.family == "macos":
-        runtime_dir = ctx.build_dir / "runtime"
-        runtime_dir.mkdir()
-        for destination, compiler, source_name in (
-            ("libgfortran_static.a", "gfortran", "libgfortran.a"),
-            ("libquadmath_static.a", "gfortran", "libquadmath.a"),
-            ("libgcc.a", "gfortran", "libgcc.a"),
-        ):
-            copied = runtime_dir / destination
-            shutil.copy2(_compiler_library(ctx, compiler, source_name), copied)
-            ctx.install(copied, "lib/" + destination)
     if ctx.target.family == "windows":
         openmp = _build_windows_openmp(ctx)
         ctx.install(openmp["libomp.lib"], "lib/libomp.lib")

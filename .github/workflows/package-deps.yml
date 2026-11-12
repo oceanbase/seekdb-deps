@@ -132,10 +132,6 @@ jobs:
           echo "CC=$llvm_prefix/bin/clang" >> "$GITHUB_ENV"
           echo "CXX=$llvm_prefix/bin/clang++" >> "$GITHUB_ENV"
 
-      - name: Install macOS VSAG Fortran runtime
-        if: ${{ matrix.target.family == 'macos' && inputs.package == 'vsag' && inputs.version == '0.16.20' }}
-        run: brew install gcc
-
       - name: Select Windows VSAG Clang compiler
         if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
         shell: pwsh
