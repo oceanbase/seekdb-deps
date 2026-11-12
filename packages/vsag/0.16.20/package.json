@@ -22,7 +22,7 @@
     "strip_prefix": "vsag-0.16.20"
   },
   "recipe": "recipes/build.py",
-  "patches": [],
+  "patches": ["patches/openblas-baseline.patch"],
   "license": {
     "spdx_id": "Apache-2.0",
     "source_path": "LICENSE"
