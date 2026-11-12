@@ -1,3 +1,19 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0e2a211..c629c35 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -268,9 +268,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pragma-clang-attribute")
+     endif ()
+     # Bundled fmt 10.2.1 fails C++20 compile-time format checks with the
+-    # macOS and Windows Clang toolchains used for these packages. VSAG's
++    # macOS, Windows, and Emscripten Clang toolchains used for these packages. VSAG's
+     # baseline is C++17, so keep those targets on that baseline.
+-    if (NOT APPLE AND NOT WIN32 AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17))
++    if (NOT APPLE AND NOT WIN32 AND NOT EMSCRIPTEN AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17))
+         set (CMAKE_CXX_STANDARD 20)
+     endif ()
+ endif ()
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index 25bd4c8..599ec26 100644
 --- a/extern/diskann/diskann.cmake
