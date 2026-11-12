@@ -1404,6 +1404,52 @@ index 98a09e6..57ebcf8 100644
  #include "mmap_io.h"
 +#endif
  #include "reader_io.h"
+diff --git a/src/prefetch.cpp b/src/prefetch.cpp
+index 6aa86c3..22037eb 100644
+--- a/src/prefetch.cpp
++++ b/src/prefetch.cpp
+@@ -27,7 +27,7 @@ PrefetchImpl<0>(const void* data){};
+ 
+ void
+ PrefetchLines(const void* data, uint64_t size) {
+-    uint64_t n = std::min(size / 64, 63UL);
++    uint64_t n = std::min<uint64_t>(size / 64, 63);
+     switch (n) {
+         PREFETCH_LINE(0);
+         PREFETCH_LINE(1);
+diff --git a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+index 7f64d17..012ba24 100644
+--- a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
++++ b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+@@ -65,7 +65,7 @@ PQFastScanQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t coun
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+diff --git a/src/quantization/product_quantization/product_quantizer.cpp b/src/quantization/product_quantization/product_quantizer.cpp
+index 85c32ca..2afa243 100644
+--- a/src/quantization/product_quantization/product_quantizer.cpp
++++ b/src/quantization/product_quantization/product_quantizer.cpp
+@@ -61,7 +61,7 @@ ProductQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t count)
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+@@ -374,4 +374,4 @@ ProductQuantizer<metric>::ProcessQueryImpl(const DataType* query,
+ }
+ 
+ TEMPLATE_QUANTIZER(ProductQuantizer)
+-}  // namespace vsag
+\ No newline at end of file
++}  // namespace vsag
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 38eb4cc..0b0b9c7 100644
 --- a/src/simd/CMakeLists.txt
