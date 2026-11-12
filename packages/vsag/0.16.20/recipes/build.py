@@ -213,12 +213,16 @@ def build(ctx):
         ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
         ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
     if ctx.target.family == "macos":
+        runtime_dir = ctx.build_dir / "runtime"
+        runtime_dir.mkdir()
         for destination, compiler, source_name in (
             ("libgfortran_static.a", "gfortran", "libgfortran.a"),
             ("libquadmath_static.a", "gfortran", "libquadmath.a"),
             ("libgcc.a", "gfortran", "libgcc.a"),
         ):
-            ctx.install(_compiler_library(ctx, compiler, source_name), "lib/" + destination)
+            copied = runtime_dir / destination
+            shutil.copy2(_compiler_library(ctx, compiler, source_name), copied)
+            ctx.install(copied, "lib/" + destination)
     if ctx.target.family == "windows":
         openmp = _build_windows_openmp(ctx)
         ctx.install(openmp["libomp.lib"], "lib/libomp.lib")
