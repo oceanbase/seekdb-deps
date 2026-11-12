@@ -81,6 +81,56 @@ index f66fc46..96578b4 100644
      # OpenBLAS CMake installs cblas.h under include/openblas.
      include_directories(${install_dir}/include/openblas)
  endif ()
+diff --git a/src/algorithm/inner_index_interface.cpp b/src/algorithm/inner_index_interface.cpp
+index a1b78dc..41fec24 100644
+--- a/src/algorithm/inner_index_interface.cpp
++++ b/src/algorithm/inner_index_interface.cpp
+@@ -16,6 +16,7 @@
+ #include "inner_index_interface.h"
+ 
+ #include <fmt/format.h>
++#include <limits>
+ 
+ #include "brute_force.h"
+ #include "empty_index_binary_set.h"
+@@ -113,15 +114,20 @@ InnerIndexInterface::Serialize() const {
+     }
+ 
+     uint64_t num_bytes = this->CalSerializeSize();
++#ifdef __EMSCRIPTEN__
++    if (num_bytes > std::numeric_limits<size_t>::max()) {
++        throw VsagException(ErrorType::NO_ENOUGH_MEMORY, "serialized index exceeds wasm32 address space");
++    }
++#endif
+     // TODO(LHT): use try catch
+ 
+-    std::shared_ptr<int8_t[]> bin(new int8_t[num_bytes]);
++    std::shared_ptr<int8_t[]> bin(new int8_t[static_cast<size_t>(num_bytes)]);
+     auto* buffer = reinterpret_cast<char*>(const_cast<int8_t*>(bin.get()));
+     BufferStreamWriter writer(buffer);
+     this->Serialize(writer);
+     Binary b{
+         .data = bin,
+-        .size = num_bytes,
++        .size = static_cast<size_t>(num_bytes),
+     };
+     BinarySet bs;
+     bs.Set(this->GetName(), b);
+@@ -183,7 +189,13 @@ InnerIndexInterface::Deserialize(const ReaderSet& reader_set) {
+         logger::debug("parse with new version format");
+         const auto& meta_reader = reader_set.Get(SERIAL_META_KEY);
+         uint64_t size = meta_reader->Size();
+-        Binary binary{.data = std::shared_ptr<int8_t[]>(new int8_t[size]), .size = size};
++#ifdef __EMSCRIPTEN__
++        if (size > std::numeric_limits<size_t>::max()) {
++            throw VsagException(ErrorType::NO_ENOUGH_MEMORY, "index metadata exceeds wasm32 address space");
++        }
++#endif
++        Binary binary{.data = std::shared_ptr<int8_t[]>(new int8_t[static_cast<size_t>(size)]),
++                      .size = static_cast<size_t>(size)};
+         meta_reader->Read(0, size, binary.data.get());
+         auto metadata = std::make_shared<Metadata>(binary);
+         if (metadata->EmptyIndex()) {
 diff --git a/src/impl/kmeans_cluster.cpp b/src/impl/kmeans_cluster.cpp
 index d6e77e1..c5e6738 100644
 --- a/src/impl/kmeans_cluster.cpp
