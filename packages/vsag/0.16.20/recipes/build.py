@@ -88,8 +88,10 @@ def build(ctx):
         if header.is_file():
             ctx.install(header, "include/vsag/" + header.name)
 
+    staged_libraries = []
     for name, candidates in LIBRARIES.items():
         ctx.install(_built_library(ctx, candidates), "lib/" + name)
+        staged_libraries.append(ctx.stage_dir / "lib" / name)
 
     fortran = ctx.environment.get("FC")
     if not fortran:
@@ -107,6 +109,14 @@ def build(ctx):
         copied = runtime_dir / destination
         shutil.copy2(_compiler_library(ctx, compiler, name), copied)
         ctx.install(copied, "lib/" + destination)
+        staged_libraries.append(ctx.stage_dir / "lib" / destination)
+
+    strip_tool = subprocess.check_output(
+        [ctx.environment["CC"], "-print-prog-name=strip"],
+        env=ctx.environment, text=True,
+    ).strip()
+    for archive in staged_libraries:
+        ctx.run([strip_tool, "--strip-debug", str(archive)])
 
     licenses = Path(__file__).resolve().parents[1] / "licenses"
     for name in ("COPYING3", "COPYING.RUNTIME"):
