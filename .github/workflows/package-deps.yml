@@ -194,7 +194,6 @@ jobs:
           "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
-          echo "EM_CONFIG=$EM_CONFIG" >> "$GITHUB_ENV"
           IFS=: read -ra path_entries <<< "$PATH"
           printf '%s\n' "${path_entries[@]}" >> "$GITHUB_PATH"
 
@@ -219,10 +218,14 @@ jobs:
 
       - name: Build iOS or WASM binary
         if: ${{ matrix.target.family == 'ios' || matrix.target.family == 'wasm' }}
-        run: >-
-          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
-          --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP"
-          --jobs "$BUILD_JOBS" --output dist
+        shell: bash
+        run: |
+          if [ "${{ matrix.target.family }}" = wasm ]; then
+            source "$EMSDK/emsdk_env.sh"
+          fi
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION" \
+            --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP" \
+            --jobs "$BUILD_JOBS" --output dist
 
       - name: Build Windows binary
         if: ${{ matrix.target.family == 'windows' }}
