@@ -90,7 +90,26 @@ def _verify_macos_deployment_target(ctx, archive):
         raise ValueError(str(archive) + " exceeds macOS deployment target")
 
 
-def _build_macos_openmp(ctx):
+def _verify_ios_archive(ctx, archive):
+    archs = subprocess.check_output(
+        ["xcrun", "lipo", "-archs", str(archive)], env=ctx.environment, text=True,
+    ).strip()
+    if archs != "arm64":
+        raise ValueError(str(archive) + " has unexpected architecture: " + archs)
+    metadata = subprocess.check_output(
+        ["xcrun", "otool", "-l", str(archive)], env=ctx.environment, text=True,
+    )
+    expected = "7" if ctx.target.document["abi"]["sdk"] == "iphonesimulator" else "2"
+    platforms = set(re.findall(r"^\s*platform\s+(\S+)", metadata, re.MULTILINE))
+    if not platforms or not platforms.issubset({expected, "IOSSIMULATOR" if expected == "7" else "IOS"}):
+        raise ValueError(str(archive) + " has unexpected Apple platforms: " + repr(platforms))
+    minimum = tuple(map(int, ctx.target.document["abi"]["minimum_os_version"].split(".")))
+    versions = re.findall(r"^\s*minos\s+(\d+)\.(\d+)", metadata, re.MULTILINE)
+    if not versions or any(tuple(map(int, version)) > minimum for version in versions):
+        raise ValueError(str(archive) + " exceeds iOS deployment target")
+
+
+def _build_apple_openmp(ctx):
     archive = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src.tar.xz")
     url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
            + "/" + archive.name)
@@ -103,7 +122,7 @@ def _build_macos_openmp(ctx):
     ctx.run(["tar", "-xf", archive, "-C", ctx.build_dir])
     source_dir = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src/runtimes")
     build_dir = ctx.build_dir / "openmp-static-build"
-    ctx.run([
+    command = [
         "cmake", "-S", source_dir, "-B", build_dir, "-G", "Ninja",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_C_COMPILER=" + ctx.environment["CC"],
@@ -115,12 +134,22 @@ def _build_macos_openmp(ctx):
         "-DLIBOMP_INSTALL_ALIASES=OFF",
         "-DOPENMP_ENABLE_LIBOMPTARGET=OFF",
         "-DOPENMP_ENABLE_OMPT_TOOLS=OFF",
-    ])
+    ]
+    if ctx.target.family == "ios":
+        command.extend(arg for arg in ctx.cmake_args if arg.startswith((
+            "-DCMAKE_SYSTEM_NAME=", "-DCMAKE_SYSTEM_VERSION=", "-DCMAKE_OSX_SYSROOT=",
+            "-DCMAKE_C_COMPILER_TARGET=", "-DCMAKE_CXX_COMPILER_TARGET=",
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=",
+        )))
+    ctx.run(command)
     ctx.run(["cmake", "--build", build_dir, "--parallel", str(ctx.jobs)])
     libraries = list(build_dir.rglob("libomp.a"))
     if len(libraries) != 1:
         raise ValueError("Expected one macOS static OpenMP library, found " + str(len(libraries)))
-    _verify_macos_deployment_target(ctx, libraries[0])
+    if ctx.target.family == "ios":
+        _verify_ios_archive(ctx, libraries[0])
+    else:
+        _verify_macos_deployment_target(ctx, libraries[0])
     return libraries[0]
 
 
@@ -189,7 +218,7 @@ def build(ctx):
         "NUM_BUILDING_JOBS": ctx.jobs,
     }
     try:
-        targets = ("vsag_static", "fmt", "io_static") if ctx.target.family == "macos" else ("vsag_static", "fmt")
+        targets = ("vsag_static", "fmt", "io_static") if ctx.target.family in ("macos", "ios") else ("vsag_static", "fmt")
         ctx.cmake(options=options, targets=targets)
     except subprocess.CalledProcessError:
         logs = sorted(ctx.build_dir.rglob("*-configure-*.log"))
@@ -214,13 +243,18 @@ def build(ctx):
         archive = _built_library(ctx, candidates)
         if ctx.target.family == "macos":
             _verify_macos_deployment_target(ctx, archive)
+        elif ctx.target.family == "ios":
+            _verify_ios_archive(ctx, archive)
         ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
-    if ctx.target.family == "macos":
+    if ctx.target.family in ("macos", "ios"):
         io_archive = _built_library(ctx, ("src/io/libio.a",))
-        _verify_macos_deployment_target(ctx, io_archive)
+        if ctx.target.family == "ios":
+            _verify_ios_archive(ctx, io_archive)
+        else:
+            _verify_macos_deployment_target(ctx, io_archive)
         ctx.install(io_archive, "lib/libio.a")
-        ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
+        ctx.install(_build_apple_openmp(ctx), "lib/libomp_static.a")
     if ctx.target.family == "windows":
         openmp = _build_windows_openmp(ctx)
         ctx.install(openmp["libomp.lib"], "lib/libomp.lib")
@@ -264,7 +298,7 @@ def build(ctx):
             shutil.copyfile(license_directory / name, staged_license)
             ctx.install(staged_license, "share/licenses/vsag/third-party/gcc/" + name)
 
-    if ctx.target.family in ("macos", "windows"):
+    if ctx.target.family in ("macos", "ios", "windows"):
         libomp_license = Path(__file__).resolve().parents[1] / "licenses/LIBOMP-LICENSE.TXT"
         staged_license = ctx.build_dir / "LIBOMP-LICENSE.TXT"
         shutil.copyfile(libomp_license, staged_license)

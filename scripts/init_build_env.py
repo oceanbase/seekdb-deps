@@ -214,9 +214,10 @@ def initialize_build_environment(profile):
                 profile["id"], host["os"], host["architecture"]
             )
         )
-    if profile["family"] != "android" and profile["family"] != host["os"]:
-        raise ValueError("Only Android targets support cross-platform build hosts")
-    if profile["family"] != "android" and host["architecture"] != profile["architecture"]:
+    cross_family = profile["family"] in ("android", "ios", "wasm")
+    if not cross_family and profile["family"] != host["os"]:
+        raise ValueError("Target family does not match the build host")
+    if not cross_family and host["architecture"] != profile["architecture"]:
         raise ValueError("This profile supports native builds only")
 
     env = dict(os.environ)
@@ -307,6 +308,55 @@ def initialize_build_environment(profile):
                          "deployment_target": abi["minimum_os_version"],
                          "cflags": cflags, "cxxflags": cxxflags,
                          "ldflags": env.get("LDFLAGS", "")})
+    elif family == "ios":
+        sdk = abi["sdk"]
+        if sdk not in ("iphoneos", "iphonesimulator"):
+            raise ValueError("Unsupported iOS SDK: " + str(sdk))
+        env.setdefault("CC", "clang")
+        env.setdefault("CXX", "clang++")
+        c_compiler, _ = _compiler_info(env["CC"], env)
+        cxx_compiler, _ = _compiler_info(env["CXX"], env)
+        sdk_path = _run(["xcrun", "--sdk", sdk, "--show-sdk-path"], env=env, capture=True).strip()
+        sdk_version = _run(["xcrun", "--sdk", sdk, "--show-sdk-version"], env=env, capture=True).strip()
+        minimum = abi["minimum_os_version"]
+        triple = "arm64-apple-ios" + minimum + ("-simulator" if sdk == "iphonesimulator" else "")
+        args.extend([
+            "-DCMAKE_SYSTEM_NAME=iOS",
+            "-DCMAKE_SYSTEM_VERSION=" + minimum,
+            "-DCMAKE_C_COMPILER=" + c_compiler["path"],
+            "-DCMAKE_CXX_COMPILER=" + cxx_compiler["path"],
+            "-DCMAKE_C_COMPILER_TARGET=" + triple,
+            "-DCMAKE_CXX_COMPILER_TARGET=" + triple,
+            "-DCMAKE_OSX_ARCHITECTURES=arm64",
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + minimum,
+            "-DCMAKE_OSX_SYSROOT=" + sdk_path,
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+        ])
+        observed.update({"c_compiler": c_compiler, "cxx_compiler": cxx_compiler,
+                         "sdk": sdk, "sdk_version": sdk_version,
+                         "deployment_target": minimum, "target_triple": triple})
+    elif family == "wasm":
+        emsdk = Path(env.get("EMSDK", "")).resolve()
+        toolchain = emsdk / "upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+        if not toolchain.is_file():
+            raise ValueError("Set EMSDK to an activated Emscripten SDK")
+        compiler = _require_command("emcc", env)
+        version_text = _run([compiler, "--version"], env=env, capture=True)
+        version = abi["emscripten_version"]
+        if not re.search(r"\b" + re.escape(version) + r"\b", version_text.splitlines()[0]):
+            raise ValueError("WASM target requires Emscripten " + version)
+        env["CC"] = compiler
+        env["CXX"] = _require_command("em++", env)
+        args.extend([
+            "-DCMAKE_TOOLCHAIN_FILE=" + str(toolchain),
+            "-DCMAKE_C_COMPILER=" + env["CC"],
+            "-DCMAKE_CXX_COMPILER=" + env["CXX"],
+            "-DCMAKE_C_FLAGS=-pthread -msimd128",
+            "-DCMAKE_CXX_FLAGS=-pthread -fexceptions -msimd128",
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+        ])
+        observed.update({"emscripten_version": version, "emsdk": str(emsdk),
+                         "features": abi["features"]})
     elif family == "windows":
         toolset = env.get("VCToolsVersion", "")
         version = _version_tuple(toolset) if toolset else ()

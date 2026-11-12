@@ -32,6 +32,9 @@ on:
           - linux-x86_64-glibc217
           - linux-aarch64-glibc217
           - macos-arm64-min13
+          - ios-arm64-device-min18
+          - ios-arm64-simulator-min18
+          - wasm32-emscripten
           - windows-x86_64-md
           - windows-x86_64-mt
           - android-arm64-v8a-api26
@@ -123,8 +126,8 @@ jobs:
         if: ${{ matrix.target.family != 'linux' }}
         run: python -m pip install --disable-pip-version-check cmake ninja
 
-      - name: Select macOS VSAG OpenMP compiler
-        if: ${{ matrix.target.family == 'macos' && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
+      - name: Select Apple VSAG OpenMP compiler
+        if: ${{ (matrix.target.family == 'macos' || matrix.target.family == 'ios') && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
         shell: bash
         run: |
           brew install llvm libomp
@@ -182,6 +185,19 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$sdk_root/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
+      - name: Install Emscripten SDK
+        if: ${{ matrix.target.family == 'wasm' }}
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.12
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
+          echo "EM_CONFIG=$EM_CONFIG" >> "$GITHUB_ENV"
+          IFS=: read -ra path_entries <<< "$PATH"
+          printf '%s\n' "${path_entries[@]}" >> "$GITHUB_PATH"
+
       - name: Build Linux binary
         if: ${{ matrix.target.family == 'linux' }}
         shell: bash -el {0}
@@ -199,6 +215,13 @@ jobs:
         run: >-
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
           --kind binary --target macos-arm64-min13 --timestamp "$RELEASE_TIMESTAMP"
+          --jobs "$BUILD_JOBS" --output dist
+
+      - name: Build iOS or WASM binary
+        if: ${{ matrix.target.family == 'ios' || matrix.target.family == 'wasm' }}
+        run: >-
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
+          --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP"
           --jobs "$BUILD_JOBS" --output dist
 
       - name: Build Windows binary
