@@ -8,6 +8,7 @@
     "macos-arm64-min13",
     "ios-arm64-device-min18",
     "ios-arm64-simulator-min18",
+    "wasm32-emscripten",
     "windows-x86_64-mt",
     "android-arm64-v8a-api26"
   ],
@@ -27,7 +28,7 @@
     "strip_prefix": "vsag-0.16.20"
   },
   "recipe": "recipes/build.py",
-  "patches": ["patches/build-adjustments.patch", "patches/apple-cross.patch"],
+  "patches": ["patches/build-adjustments.patch", "patches/apple-cross.patch", "patches/wasm-cross.patch"],
   "license": {
     "spdx_id": "Apache-2.0",
     "source_path": "LICENSE"
@@ -65,6 +66,17 @@
       "lib/libsimd.a",
       "lib/libio.a",
       "lib/libomp_static.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "wasm": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
       "lib/libcpuinfo.a",
       "lib/libdiskann.a",
       "lib/libopenblas.a",

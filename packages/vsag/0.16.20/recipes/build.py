@@ -109,6 +109,19 @@ def _verify_ios_archive(ctx, archive):
         raise ValueError(str(archive) + " exceeds iOS deployment target")
 
 
+def _verify_wasm_archive(ctx, archive):
+    members = subprocess.check_output(
+        ["emar", "t", str(archive)], env=ctx.environment, text=True,
+    ).splitlines()
+    if not members:
+        raise ValueError(str(archive) + " has no object files")
+    first = subprocess.check_output(
+        ["emar", "p", str(archive), members[0]], env=ctx.environment,
+    )
+    if not (first.startswith(b"\0asm") or first.startswith(b"BC\xc0\xde")):
+        raise ValueError(str(archive) + " does not contain WebAssembly or LLVM bitcode")
+
+
 def _build_apple_openmp(ctx):
     archive = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src.tar.xz")
     url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
@@ -245,6 +258,8 @@ def build(ctx):
             _verify_macos_deployment_target(ctx, archive)
         elif ctx.target.family == "ios":
             _verify_ios_archive(ctx, archive)
+        elif ctx.target.family == "wasm":
+            _verify_wasm_archive(ctx, archive)
         ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family in ("macos", "ios"):
