@@ -944,6 +944,113 @@ index d21476b..cf7e269 100644
  
      /**
       * @brief Constructs a new object of type T.
+diff --git a/src/algorithm/hgraph.cpp b/src/algorithm/hgraph.cpp
+index 66544e5..2ceacda 100644
+--- a/src/algorithm/hgraph.cpp
++++ b/src/algorithm/hgraph.cpp
+@@ -326,7 +326,7 @@ HGraph::KnnSearch(const DatasetPtr& query,
+     }
+ 
+     auto params = HGraphSearchParameters::FromJson(parameters);
+-    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++    auto ef_search_threshold = std::max<int64_t>(AMPLIFICATION_FACTOR * k, 1000);
+     CHECK_ARGUMENT(  // NOLINT
+         (1 <= params.ef_search) and (params.ef_search <= ef_search_threshold),
+         fmt::format("ef_search({}) must in range[1, {}]", params.ef_search, ef_search_threshold));
+@@ -1502,12 +1502,12 @@ HGraph::CheckAndMappingExternalParam(const JsonType& external_param,
+     hgraph_parameter->FromJson(inner_json);
+     uint64_t max_degree = hgraph_parameter->bottom_graph_param->max_degree_;
+ 
+-    auto max_degree_threshold = std::max(common_param.dim_, 128L);
++    auto max_degree_threshold = std::max<int64_t>(common_param.dim_, 128);
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= max_degree) and (max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", max_degree, max_degree_threshold));
+ 
+-    auto construction_threshold = std::max(1000UL, AMPLIFICATION_FACTOR * max_degree);
++    auto construction_threshold = std::max<uint64_t>(1000, AMPLIFICATION_FACTOR * max_degree);
+     CHECK_ARGUMENT((max_degree <= hgraph_parameter->ef_construction) and  // NOLINT
+                        (hgraph_parameter->ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
+@@ -1693,7 +1693,7 @@ HGraph::SearchWithRequest(const SearchRequest& request) const {
+ 
+     auto params = HGraphSearchParameters::FromJson(request.params_str_);
+ 
+-    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++    auto ef_search_threshold = std::max<int64_t>(AMPLIFICATION_FACTOR * k, 1000);
+     CHECK_ARGUMENT(  // NOLINT
+         (1 <= params.ef_search) and (params.ef_search <= ef_search_threshold),
+         fmt::format("ef_search({}) must in range[1, {}]", params.ef_search, ef_search_threshold));
+diff --git a/src/algorithm/hnswlib/hnswalg.cpp b/src/algorithm/hnswlib/hnswalg.cpp
+index 6ba7aa6..e37251c 100644
+--- a/src/algorithm/hnswlib/hnswalg.cpp
++++ b/src/algorithm/hnswlib/hnswalg.cpp
+@@ -1578,7 +1578,7 @@ HierarchicalNSW::addPoint(const void* data_point, LabelType label, int level) {
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchKnn(const void* query_data,
+                            size_t k,
+-                           uint64_t ef,
++                           size_t ef,
+                            const vsag::FilterPtr is_id_allowed,
+                            const float skip_ratio,
+                            vsag::Allocator* allocator,
+@@ -1695,7 +1695,7 @@ HierarchicalNSW::searchKnn(const void* query_data,
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchRange(const void* query_data,
+                              float radius,
+-                             uint64_t ef,
++                             size_t ef,
+                              const vsag::FilterPtr is_id_allowed) const {
+     std::shared_lock resize_lock(resize_mutex_);
+     std::priority_queue<std::pair<float, LabelType>> result;
+diff --git a/src/algorithm/hnswlib/hnswalg.h b/src/algorithm/hnswlib/hnswalg.h
+index d255712..26a5995 100644
+--- a/src/algorithm/hnswlib/hnswalg.h
++++ b/src/algorithm/hnswlib/hnswalg.h
+@@ -433,7 +433,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::Allocator* allocator = nullptr,
+@@ -443,7 +443,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override;
+ 
+     void
+diff --git a/src/algorithm/ivf_partition/gno_imi_partition.cpp b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+index c232934..fb155e4 100644
+--- a/src/algorithm/ivf_partition/gno_imi_partition.cpp
++++ b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+@@ -336,7 +336,7 @@ GNOIMIPartition::inner_classify_datas(BruteForce& route_index, const float* data
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max<int64_t>(10, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result = route_index.KnnSearch(query, buckets_per_data, search_param, filter);
+         const auto* result_ids = search_result->GetIds();
+diff --git a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+index 6c82b15..d2563c5 100644
+--- a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
++++ b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+@@ -94,7 +94,7 @@ IVFNearestPartition::ClassifyDatas(const void* datas,
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max<int64_t>(10, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result =
+             this->route_index_ptr_->KnnSearch(query, buckets_per_data, search_param, filter);
 diff --git a/src/data_cell/flatten_interface.cpp b/src/data_cell/flatten_interface.cpp
 index b32e6d3..9a9d16e 100644
 --- a/src/data_cell/flatten_interface.cpp
@@ -1066,6 +1173,41 @@ index 1977ed7..6eef685 100644
          auto ret = raw_allocator_->Reallocate(p, size);
          if (not ret) {
              throw std::bad_alloc();
+diff --git a/src/index/hnsw.cpp b/src/index/hnsw.cpp
+index 616d0a0..979ec90 100644
+--- a/src/index/hnsw.cpp
++++ b/src/index/hnsw.cpp
+@@ -255,7 +255,7 @@ HNSW::knn_search(const DatasetPtr& query,
+ 
+         // check search parameters
+         auto params = HnswSearchParameters::FromJson(parameters);
+-        auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++        auto ef_search_threshold = std::max<int64_t>(AMPLIFICATION_FACTOR * k, 1000);
+         CHECK_ARGUMENT(  // NOLINT
+             (1 <= params.ef_search) and (params.ef_search <= ef_search_threshold),
+             fmt::format(
+diff --git a/src/index/hnsw_zparameters.cpp b/src/index/hnsw_zparameters.cpp
+index 6096b89..5e1cab0 100644
+--- a/src/index/hnsw_zparameters.cpp
++++ b/src/index/hnsw_zparameters.cpp
+@@ -52,7 +52,7 @@ HnswParameters::FromJson(JsonType& hnsw_param_obj, const IndexCommonParam& index
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_M].is_number_integer(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_M));
+     obj.max_degree = hnsw_param_obj[HNSW_PARAMETER_M];
+-    auto max_degree_threshold = std::max(index_common_param.dim_, 128L);
++    auto max_degree_threshold = std::max<int64_t>(index_common_param.dim_, 128);
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= obj.max_degree) and (obj.max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", obj.max_degree, max_degree_threshold));
+@@ -64,7 +64,7 @@ HnswParameters::FromJson(JsonType& hnsw_param_obj, const IndexCommonParam& index
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION].is_number_integer(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_CONSTRUCTION));
+     obj.ef_construction = hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION];
+-    auto construction_threshold = std::max(1000L, AMPLIFICATION_FACTOR * obj.max_degree);
++    auto construction_threshold = std::max<int64_t>(1000, AMPLIFICATION_FACTOR * obj.max_degree);
+     CHECK_ARGUMENT((obj.max_degree <= obj.ef_construction) and  // NOLINT
+                        (obj.ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
 diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
 index 9ef752e..398138a 100644
 --- a/src/io/CMakeLists.txt
