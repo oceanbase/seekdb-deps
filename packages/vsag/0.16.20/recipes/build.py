@@ -265,8 +265,9 @@ def build(ctx):
         ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "wasm":
+        nm = Path(ctx.environment["EMSDK"]) / "upstream/bin/llvm-nm"
         undefined = subprocess.check_output(
-            ["llvm-nm", "--undefined-only", *map(str, staged_libraries)],
+            [str(nm), "--undefined-only", *map(str, staged_libraries)],
             env=ctx.environment, text=True,
         )
         openmp = re.findall(r"\bU (omp_\w+)", undefined)
