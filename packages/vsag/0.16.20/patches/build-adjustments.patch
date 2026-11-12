@@ -1073,6 +1073,22 @@ index 6c82b15..d2563c5 100644
          FilterPtr filter = nullptr;
          auto search_result =
              this->route_index_ptr_->KnnSearch(query, buckets_per_data, search_param, filter);
+diff --git a/src/attr/argparse.cpp b/src/attr/argparse.cpp
+index 7846ec0..c4e9e02 100644
+--- a/src/attr/argparse.cpp
++++ b/src/attr/argparse.cpp
+@@ -15,6 +15,11 @@
+ 
+ #include "argparse.h"
+ 
++#ifdef _WIN32
++#undef ERROR
++#undef IN
++#endif
++
+ #include <antlr4-autogen/FCLexer.h>
+ 
+ #include "expression_visitor.h"
 diff --git a/src/data_cell/flatten_interface.cpp b/src/data_cell/flatten_interface.cpp
 index b32e6d3..9a9d16e 100644
 --- a/src/data_cell/flatten_interface.cpp
