@@ -230,6 +230,8 @@ def build(ctx):
         "ROARING_DISABLE_AVX512": True,
         "NUM_BUILDING_JOBS": ctx.jobs,
     }
+    if ctx.target.family == "wasm":
+        options["DISABLE_SSE_FORCE"] = True
     try:
         targets = ("vsag_static", "fmt", "io_static") if ctx.target.family in ("macos", "ios") else ("vsag_static", "fmt")
         ctx.cmake(options=options, targets=targets)
