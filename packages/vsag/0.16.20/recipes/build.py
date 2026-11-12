@@ -3,6 +3,7 @@
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 
 LIBRARIES = {
@@ -51,16 +52,26 @@ def _compiler_library(ctx, compiler, name):
 
 
 def build(ctx):
-    ctx.cmake(options={
-        "CMAKE_INSTALL_PREFIX": str(ctx.build_dir / "install"),
-        "ENABLE_CXX11_ABI": True,
-        "ENABLE_INTEL_MKL": False,
-        "ENABLE_TESTS": False,
-        "ENABLE_EXAMPLES": False,
-        "ENABLE_TOOLS": False,
-        "ROARING_DISABLE_AVX512": True,
-        "NUM_BUILDING_JOBS": ctx.jobs,
-    }, targets=("vsag_static", "fmt"))
+    try:
+        ctx.cmake(options={
+            "CMAKE_INSTALL_PREFIX": str(ctx.build_dir / "install"),
+            "ENABLE_CXX11_ABI": True,
+            "ENABLE_INTEL_MKL": False,
+            "ENABLE_TESTS": False,
+            "ENABLE_EXAMPLES": False,
+            "ENABLE_TOOLS": False,
+            "ROARING_DISABLE_AVX512": True,
+            "NUM_BUILDING_JOBS": ctx.jobs,
+        }, targets=("vsag_static", "fmt"))
+    except subprocess.CalledProcessError:
+        for log in sorted(ctx.build_dir.rglob("*-build-*.log")):
+            print("VSAG dependency log: " + str(log), file=sys.stderr)
+            lines = log.read_text(errors="replace").splitlines()
+            for index, line in enumerate(lines):
+                if any(word in line.lower() for word in ("failed:", "error:", "fatal error")):
+                    print("\n".join(lines[max(0, index - 2):index + 5]), file=sys.stderr)
+            print("\n".join(lines[-20:]), file=sys.stderr)
+        raise
 
     for header in sorted((ctx.source_dir / "include/vsag").iterdir()):
         if header.is_file():
