@@ -1,15 +1,836 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 34d0678..9e41f70 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -8,6 +8,15 @@ project (VSAG
+         LANGUAGES C CXX
+ )
+ 
++if (WIN32)
++    add_compile_definitions (NOMINMAX _WINDOWS)
++endif ()
++
++option (ENABLE_LIBAIO "Build Linux native asynchronous I/O" OFF)
++if (ENABLE_LIBAIO)
++    add_compile_definitions (HAVE_LIBAIO=1)
++endif ()
++
+ message ("CPU ARCH: ${CMAKE_HOST_SYSTEM_PROCESSOR}")
+ 
+ macro (vsag_add_exe_linker_flag flag)
+@@ -64,14 +73,22 @@ else ()
+ endif ()
+ 
+ if (ENABLE_WERROR)
+-    add_compile_options (-Werror)
++    if (MSVC)
++        add_compile_options (/WX)
++    else ()
++        add_compile_options (-Werror)
++    endif ()
+ endif ()
+ 
+-vsag_add_exe_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-fvisibility=hidden)
++if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
++    vsag_add_exe_linker_flag (-static-libstdc++)
++    vsag_add_shared_linker_flag (-static-libstdc++)
++endif ()
++if (NOT WIN32)
++    vsag_add_shared_linker_flag (-fvisibility=hidden)
++endif ()
+ 
+-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT WIN32)
+     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -gdwarf-4")
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-4")
+ 
+@@ -106,7 +123,7 @@ if (ENABLE_LIBCXX)
+         message (FATAL_ERROR "libc++ or libc++abi not found")
+     endif ()
+ else ()
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
+     endif ()
+ endif ()
+@@ -119,8 +136,10 @@ if (CCACHE_FOUND AND ENABLE_CCACHE)
+     set_property (GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+ endif ()
+ 
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+ 
+ set (ld_flags
+         "-L${CMAKE_INSTALL_PREFIX}/lib"
+@@ -146,20 +165,36 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
+ endif ()
+ string (JOIN " " ld_flags ${ld_flags})
+ 
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+ 
+ set (common_cmake_args
+         "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+         "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+         "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+-        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
+-        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
++        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
++        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
+         "-DCMAKE_EXE_LINKER_FLAGS=${extra_link_libs}"
+         "-DCMAKE_SHARED_LINKER_FLAGS=${extra_link_libs}"
+         "-DCMAKE_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include"
+         "-DCMAKE_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib:/opt/alibaba-cloud-compiler/lib64"
+ )
++if (MSVC)
++    list (APPEND common_cmake_args
++        "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW"
++        "-DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}")
++endif ()
++if (CMAKE_TOOLCHAIN_FILE)
++    list (APPEND common_cmake_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
++endif ()
++if (ANDROID)
++    list (APPEND common_cmake_args
++        "-DANDROID_ABI=${ANDROID_ABI}"
++        "-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
++        "-DANDROID_NDK=${ANDROID_NDK}")
++endif ()
+ 
+ set (common_configure_envs
+         "env"
+@@ -188,7 +223,9 @@ include (extern/openblas/openblas.cmake)
+ include (extern/mkl/mkl.cmake)
+ include (extern/diskann/diskann.cmake)
+ include (extern/spdlog/spdlog.cmake)
+-include (extern/catch2/catch2.cmake)
++if (ENABLE_TESTS)
++    include (extern/catch2/catch2.cmake)
++endif ()
+ include (extern/cpuinfo/cpuinfo.cmake)
+ include (extern/fmt/fmt.cmake)
+ include (extern/thread_pool/thread_pool.cmake)
+@@ -212,18 +249,27 @@ set (CMAKE_CXX_STANDARD 17)
+ set (CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+-    if (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17)
++    if (APPLE)
++        # Boost 1.67 uses a pragma that newer Clang diagnoses under -Werror.
++        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pragma-clang-attribute")
++    endif ()
++    # Bundled fmt 10.2.1 fails C++20 compile-time format checks with the
++    # macOS and Windows Clang toolchains used for these packages. VSAG's
++    # baseline is C++17, so keep those targets on that baseline.
++    if (NOT APPLE AND NOT WIN32 AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17))
+         set (CMAKE_CXX_STANDARD 20)
+     endif ()
+ endif ()
+ 
+ # debug or release or sanitize
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
+-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
++if (NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
++endif ()
++if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize" AND NOT MSVC)
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
+ endif ()
+ 
+@@ -272,7 +318,11 @@ endif ()
+ 
+ # sources
+ add_subdirectory (src)
+-add_subdirectory (mockimpl)
++if (ENABLE_TESTS)
++if (ENABLE_TESTS)
++    add_subdirectory (mockimpl)
++endif ()
++endif ()
+ if (ENABLE_EXAMPLES)
+     add_subdirectory (examples/cpp)
+ endif ()
+@@ -314,7 +364,9 @@ find_package (Git)
+ add_custom_target (version
+         ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
++        -D VSAG_VERSION=v0.16.20
+         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+ )
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+index 5581113..fa401de 100644
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -1,4 +1,4 @@
+-if(GIT_EXECUTABLE)
++if(GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component(SRC_DIR ${SRC} DIRECTORY)
+   # Generate a git-describe version string from Git repository tags
+   execute_process(
+diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
+index 95e0744..e63089a 100644
+--- a/extern/antlr4/antlr4.cmake
++++ b/extern/antlr4/antlr4.cmake
+@@ -11,6 +11,10 @@ else ()
+ endif ()
+ 
+ set (FULL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VSAG_ANTLR4_CXX11_ABI}")
++if (MSVC)
++    # ANTLR4 4.13.2 uses std::chrono without including its header on MSVC.
++    set (FULL_CXX_FLAGS "${FULL_CXX_FLAGS} /FIchrono")
++endif ()
+ 
+ ExternalProject_Add(
+         ${name}
+@@ -28,7 +32,7 @@ ExternalProject_Add(
+         BINARY_DIR ${binary_dir}
+         BUILD_IN_SOURCE 0
+         CONFIGURE_COMMAND
+-        cmake ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_STATIC_CRT=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
+         BUILD_COMMAND
+         cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
+         INSTALL_COMMAND cmake --install build
+@@ -48,7 +52,7 @@ include_directories(extern/antlr4/fc)
+ file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
+ add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
+ add_dependencies(antlr4-autogen antlr4)
+-target_compile_options(antlr4-autogen PRIVATE ${common_cmake_args} ${VSAG_ANTLR4_CXX11_ABI})
++target_compile_options(antlr4-autogen PRIVATE ${VSAG_ANTLR4_CXX11_ABI})
+ set_property(TARGET antlr4-autogen PROPERTY CXX_STANDARD 17)
+ target_link_libraries(antlr4-autogen antlr4-runtime)
+ 
+diff --git a/extern/boost/boost.cmake b/extern/boost/boost.cmake
+index 61ba4d3..6b6c3b6 100644
+--- a/extern/boost/boost.cmake
++++ b/extern/boost/boost.cmake
+@@ -1,16 +1,13 @@
+ # Copyright (c) 2022 Ant Group. All rights reserved.
+ 
+-cmake_policy(SET CMP0114 NEW)
+-
+ set(name boost)
+ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
+ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+-get_filename_component(compiler_path ${CMAKE_CXX_COMPILER} DIRECTORY)
++
++# DiskANN uses only Boost headers, so avoid compiling unused Boost libraries.
+ ExternalProject_Add(
+     ${name}
+     URL https://archives.boost.io/release/1.67.0/source/boost_1_67_0.tar.gz
+-        # this url is maintained by the vsag project, if it's broken, please try
+-        #  the latest commit or contact the vsag project
+         http://vsagcache.oss-rg-china-mainland.aliyuncs.com/boost/boost_1_67_0.tar.gz
+     URL_HASH SHA256=8aa4e330c870ef50a896634c931adf468b21f8a69b77007e45c444151229f665
+     DOWNLOAD_NAME boost_1_67_0.tar.gz
+@@ -20,53 +17,9 @@ ExternalProject_Add(
+     DOWNLOAD_DIR ${DOWNLOAD_DIR}
+     SOURCE_DIR ${source_dir}
+     CONFIGURE_COMMAND ""
+-    CONFIGURE_COMMAND
+-	env PATH=/usr/lib/ccache:$ENV{PATH}
+-        ./bootstrap.sh
+-            --without-icu
+-            --without-libraries=python,test,stacktrace,mpi,log,graph,graph_parallel
+-            --prefix=${install_dir}
+-    BUILD_COMMAND
+-	env PATH=/usr/lib/ccache:$ENV{PATH}
+-        ./b2 install
+-            -d0
+-            -j${NUM_BUILDING_JOBS}
+-            --prefix=${install_dir}
+-            --disable-icu
+-            include=${install_dir}/include
+-            linkflags=-L${install_dir}/lib
+-            "cxxflags=-fPIC ${extra_cpp_flags}"
+-            runtime-link=static
+-            link=static
+-            variant=release
+-    BUILD_IN_SOURCE 1
+-    INSTALL_COMMAND ""
+-    LOG_CONFIGURE TRUE
+-    LOG_BUILD TRUE
+-    LOG_INSTALL TRUE
+-    DOWNLOAD_NO_PROGRESS 0
++    BUILD_COMMAND ""
++    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${source_dir}/boost ${install_dir}/include/boost
++    DOWNLOAD_NO_PROGRESS 1
+     INACTIVITY_TIMEOUT 5
+-    # filesize ~= 90MiB
+     TIMEOUT 90
+ )
+-
+-ExternalProject_Add_Step(${name} setup-compiler
+-    DEPENDEES configure
+-    DEPENDERS build
+-    COMMAND
+-        echo "using gcc : : ${CMAKE_CXX_COMPILER} $<SEMICOLON>"
+-            > ${source_dir}/tools/build/src/user-config.jam
+-    WORKING_DIRECTORY ${source_dir}
+-)
+-
+-ExternalProject_Add_Step(${name} clean
+-    EXCLUDE_FROM_MAIN TRUE
+-    ALWAYS TRUE
+-    DEPENDEES configure
+-    COMMAND ./b2 clean
+-    COMMAND rm -f ${BUILD_INFO_DIR}/${name}-build
+-    WORKING_DIRECTORY ${source_dir}
+-)
+-
+-ExternalProject_Add_StepTargets(${name} clean)
+-
+diff --git a/extern/diskann/DiskANN/include/cosine_similarity.h b/extern/diskann/DiskANN/include/cosine_similarity.h
+index 918a992..7ec9e6b 100644
+--- a/extern/diskann/DiskANN/include/cosine_similarity.h
++++ b/extern/diskann/DiskANN/include/cosine_similarity.h
+@@ -23,7 +23,7 @@
+ 
+ extern bool Avx2SupportedCPU;
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ // SIMD implementation of Cosine similarity. Taken from hnsw library.
+ 
+ /**
+diff --git a/extern/diskann/DiskANN/include/diskann_logger.h b/extern/diskann/DiskANN/include/diskann_logger.h
+index 0b17807..3ee06dd 100644
+--- a/extern/diskann/DiskANN/include/diskann_logger.h
++++ b/extern/diskann/DiskANN/include/diskann_logger.h
+@@ -22,7 +22,7 @@ using std::cerr;
+ using std::cout;
+ #endif
+ 
+-enum class DISKANN_DLLEXPORT LogLevel
++enum class LogLevel
+ {
+     LL_Info = 0,
+     LL_Error,
+diff --git a/extern/diskann/DiskANN/include/local_file_reader.h b/extern/diskann/DiskANN/include/local_file_reader.h
+index e0f7794..c85afd2 100644
+--- a/extern/diskann/DiskANN/include/local_file_reader.h
++++ b/extern/diskann/DiskANN/include/local_file_reader.h
+@@ -1,9 +1,6 @@
+ 
+ #pragma once
+ 
+-#ifndef _WINDOWS
+-
+-#include <malloc.h>
+ #include <cstdio>
+ #include <mutex>
+ #include <thread>
+@@ -49,7 +46,3 @@ public:
+     // NOTE :: blocking call
+     void read(std::vector<AlignedRead> &read_reqs, bool async = false, CallBack callBack = nullptr);
+ };
+-
+-
+-
+-#endif
+diff --git a/extern/diskann/DiskANN/include/locking.h b/extern/diskann/DiskANN/include/locking.h
+index 2a70f4f..9ad8179 100644
+--- a/extern/diskann/DiskANN/include/locking.h
++++ b/extern/diskann/DiskANN/include/locking.h
+@@ -3,13 +3,13 @@
+ 
+ #include <mutex>
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ #include "windows_slim_lock.h"
+ #endif
+ 
+ namespace diskann
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ using non_recursive_mutex = windows_exclusive_slim_lock;
+ using LockGuard = windows_exclusive_slim_lock_guard;
+ #else
+diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
+index 22fa9f6..d4f8d51 100644
+--- a/extern/diskann/DiskANN/include/utils.h
++++ b/extern/diskann/DiskANN/include/utils.h
+@@ -4,6 +4,7 @@
+ #pragma once
+ 
+ #include <errno.h>
++#include <stdlib.h>
+ 
+ #if defined(__i386__) || defined(__x86_64__)
+ #include <xmmintrin.h>
+@@ -113,6 +114,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
+ #endif
+@@ -240,7 +243,12 @@ inline void alloc_aligned(void **ptr, size_t size, size_t align)
+     if (IS_ALIGNED(size, align) == 0)
+         report_misalignment_of_requested_size(align);
+ #ifndef _WINDOWS
++#ifdef __ANDROID__
++    if (::posix_memalign(ptr, align, size) != 0)
++        *ptr = nullptr;
++#else
+     *ptr = ::aligned_alloc(align, size);
++#endif
+ #else
+     *ptr = ::_aligned_malloc(size, align); // note the swapped arguments!
+ #endif
+@@ -710,6 +718,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
+ #endif
+diff --git a/extern/diskann/DiskANN/include/windows_customizations.h b/extern/diskann/DiskANN/include/windows_customizations.h
+index e6c5846..dd4b023 100644
+--- a/extern/diskann/DiskANN/include/windows_customizations.h
++++ b/extern/diskann/DiskANN/include/windows_customizations.h
+@@ -7,8 +7,10 @@
+ 
+ #ifdef _WINDLL
+ #define DISKANN_DLLEXPORT __declspec(dllexport)
+-#else
++#elif defined(DISKANN_USE_DLL)
+ #define DISKANN_DLLEXPORT __declspec(dllimport)
++#else
++#define DISKANN_DLLEXPORT
+ #endif
+ 
+ #else
+diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
+index c86c1ba..24f62bd 100644
+--- a/extern/diskann/DiskANN/src/disk_utils.cpp
++++ b/extern/diskann/DiskANN/src/disk_utils.cpp
+@@ -25,7 +25,7 @@ namespace diskann
+ void add_new_file_to_single_index(std::string index_file, std::string new_file)
+ {
+     std::unique_ptr<uint64_t[]> metadata;
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     diskann::load_bin<uint64_t>(index_file, metadata, nr, nc);
+     if (nc != 1)
+     {
+@@ -160,11 +160,13 @@ T *load_warmup(MemoryMappedFiles &files, const std::string &cache_warmup_file, u
+                uint64_t warmup_dim, uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (files.fileExists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         diskann::cout << "In the warmup file: " << cache_warmup_file << " File dim: " << file_dim
+                       << " File aligned dim: " << file_aligned_dim << " Expected dim: " << warmup_dim
+                       << " Expected aligned dim: " << warmup_aligned_dim << std::endl;
+@@ -192,11 +194,13 @@ T *load_warmup(const std::string &cache_warmup_file, uint64_t &warmup_num, uint6
+                uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (file_exists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         if (file_dim != warmup_dim || file_aligned_dim != warmup_aligned_dim)
+         {
+             std::stringstream stream;
+@@ -419,7 +423,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+         {
+             // Gopal. random_shuffle() is deprecated.
+             std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-            nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++            nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+             // write into merged ofstream
+             merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+             merged_vamana_writer.write((char *)final_nhood.data(), nnbrs * sizeof(uint32_t));
+@@ -458,7 +462,7 @@ int merge_shards(const std::string &vamana_prefix, const std::string &vamana_suf
+ 
+     // Gopal. random_shuffle() is deprecated.
+     std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-    nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++    nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+     // write into merged ofstream
+     merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+     if (nnbrs > 0)
+@@ -495,7 +499,7 @@ void breakup_dense_points(const std::string data_file, const std::string labels_
+     std::string token, line;
+     std::ifstream labels_stream(labels_file);
+     T *data;
+-    uint64_t npts, ndims;
++    size_t npts, ndims;
+     diskann::load_bin<T>(data_file, data, npts, ndims);
+ 
+     std::unordered_map<uint32_t, uint32_t> dummy_pt_ids;
+@@ -580,7 +584,7 @@ void extract_shard_labels(const std::string &in_label_file, const std::string &s
+     diskann::cout << "Extracting labels for shard" << std::endl;
+ 
+     uint32_t *ids = nullptr;
+-    uint64_t num_ids, tmp_dim;
++    size_t num_ids, tmp_dim;
+     diskann::load_bin(shard_ids_bin, ids, num_ids, tmp_dim);
+ 
+     uint32_t counter = 0, shard_counter = 0;
+@@ -694,7 +698,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
+         diskann::IndexWriteParameters paras =
+             diskann::IndexWriteParametersBuilder(L, (2 * R / 3)).with_filter_list_size(Lf).build();
+ 
+-        uint64_t shard_base_dim, shard_base_pts;
++        size_t shard_base_dim, shard_base_pts;
+         get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
+         diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts, false, false, false, build_pq_bytes > 0,
+                                  build_pq_bytes, use_opq);
+diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
+index 707bb05..a6c6396 100644
+--- a/extern/diskann/DiskANN/src/distance.cpp
++++ b/extern/diskann/DiskANN/src/distance.cpp
+@@ -84,7 +84,7 @@ template <typename T> size_t Distance<T>::get_required_alignment() const
+ 
+ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<int8_t>(a, b, length);
+ #else
+     int magA = 0, magB = 0, scalarProduct = 0;
+@@ -101,7 +101,7 @@ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t len
+ 
+ float DistanceCosineFloat::compare(const float *a, const float *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<float>(a, b, length);
+ #else
+     float magA = 0, magB = 0, scalarProduct = 0;
+@@ -247,7 +247,7 @@ template <typename T> float SlowDistanceL2<T>::compare(const T *a, const T *b, u
+     return result;
+ }
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+     __m128 r = _mm_setzero_ps();
+@@ -304,6 +304,27 @@ float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t lengt
+ 
+     return sum.m128_f32[0] + sum.m128_f32[1] + sum.m128_f32[2] + sum.m128_f32[3];
+ }
++#elif defined(_WINDOWS)
++float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = static_cast<float>(a[i]) - static_cast<float>(b[i]);
++        result += difference * difference;
++    }
++    return result;
++}
++float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = a[i] - b[i];
++        result += difference * difference;
++    }
++    return result;
++}
+ #else
+ float AVXDistanceL2Int8::compare(const int8_t *, const int8_t *, uint32_t) const
+ {
+diff --git a/extern/diskann/DiskANN/src/math_utils.cpp b/extern/diskann/DiskANN/src/math_utils.cpp
+index 9244715..ee60335 100644
+--- a/extern/diskann/DiskANN/src/math_utils.cpp
++++ b/extern/diskann/DiskANN/src/math_utils.cpp
+@@ -2,7 +2,6 @@
+ // Licensed under the MIT license.
+ 
+ #include <limits>
+-#include <malloc.h>
+ #include <math_utils.h>
+ // #include <mkl.h>
+ #include <cblas.h>
+diff --git a/extern/diskann/DiskANN/src/partition.cpp b/extern/diskann/DiskANN/src/partition.cpp
+index 155db16..60996ef 100644
+--- a/extern/diskann/DiskANN/src/partition.cpp
++++ b/extern/diskann/DiskANN/src/partition.cpp
+@@ -472,7 +472,7 @@ int retrieve_shard_data_from_ids(const std::string data_file, std::string idmap_
+     shard_data_writer.write((char *)&basedim32, sizeof(uint32_t));
+ 
+     uint32_t *shard_ids;
+-    uint64_t shard_size, tmp;
++    size_t shard_size, tmp;
+     diskann::load_bin<uint32_t>(idmap_filename, shard_ids, shard_size, tmp);
+ 
+     uint32_t cur_pos = 0;
+diff --git a/extern/diskann/DiskANN/src/pq.cpp b/extern/diskann/DiskANN/src/pq.cpp
+index bdc023d..03e65f0 100644
+--- a/extern/diskann/DiskANN/src/pq.cpp
++++ b/extern/diskann/DiskANN/src/pq.cpp
+@@ -49,7 +49,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ {
+ #endif
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     std::string rotmat_file = std::string(pq_table_file) + "_rotation_matrix.bin";
+ 
+ #ifdef EXEC_ENV_OLS
+@@ -171,7 +171,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ void FixedChunkPQTable::load_pq_centroid_bin(std::stringstream &pq_table, size_t num_chunks)
+ {
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+ 
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pq_table, reinterpret_cast<size_t *&>(file_offset_data), nr, nc);
+diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+index e45ebb4..bdf84ed 100644
+--- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
++++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+@@ -10,11 +10,7 @@
+ #include "pq_flash_index.h"
+ #include "cosine_similarity.h"
+ 
+-#ifdef _WINDOWS
+-#include "windows_aligned_file_reader.h"
+-#else
+ #include "local_file_reader.h"
+-#endif
+ 
+ #define READ_U64(stream, val) stream.read((char *)&val, sizeof(uint64_t))
+ #define READ_U32(stream, val) stream.read((char *)&val, sizeof(uint32_t))
+@@ -213,7 +209,7 @@ void PQFlashIndex<T, LabelT>::generate_cache_list_from_sample_queries(std::strin
+         this->node_visit_counter[i].second = 0;
+     }
+ 
+-    uint64_t sample_num, sample_dim, sample_aligned_dim;
++    size_t sample_num, sample_dim, sample_aligned_dim;
+     T *samples;
+ 
+ #ifdef EXEC_ENV_OLS
+@@ -253,7 +249,7 @@ void PQFlashIndex<T, LabelT>::generate_cache_list_from_sample_queries(std::strin
+               });
+     node_list.clear();
+     node_list.shrink_to_fit();
+-    num_nodes_to_cache = std::min(num_nodes_to_cache, this->node_visit_counter.size());
++    num_nodes_to_cache = std::min<uint64_t>(num_nodes_to_cache, this->node_visit_counter.size());
+     node_list.reserve(num_nodes_to_cache);
+     for (uint64_t i = 0; i < num_nodes_to_cache; i++)
+     {
+@@ -340,8 +336,8 @@ void PQFlashIndex<T, LabelT>::cache_bfs_levels(uint64_t num_nodes_to_cache, std:
+         diskann::cout << "Level: " << lvl << std::flush;
+         bool finish_flag = false;
+ 
+-        uint64_t BLOCK_SIZE = 1024;
+-        uint64_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
++        size_t BLOCK_SIZE = 1024;
++        size_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
+         for (size_t block = 0; block < nblocks && !finish_flag; block++)
+         {
+             diskann::cout << "." << std::flush;
+@@ -1010,7 +1006,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
+ 
+     if (file_exists(norm_file) && metric == diskann::Metric::INNER_PRODUCT)
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+         diskann::load_bin<float>(norm_file, norm_val, dumr, dumc);
+         this->max_base_norm = norm_val[0];
+@@ -1039,7 +1035,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
+     size_t pq_file_dim, pq_file_num_centroids;
+ 
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
+     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
+@@ -1290,7 +1286,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(uint32_t num_threads, cons
+ 
+     if (file_exists(norm_file) && metric == diskann::Metric::INNER_PRODUCT)
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+         diskann::load_bin<float>(norm_file, norm_val, dumr, dumc);
+         this->max_base_norm = norm_val[0];
+@@ -1310,7 +1306,7 @@ int PQFlashIndex<T, LabelT>::load_from_separate_paths(std::stringstream &pivots_
+ 
+     size_t pq_file_dim, pq_file_num_centroids;
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pivots_stream, reinterpret_cast<size_t *&>(file_offset_data), nrow, ncol);
+     get_bin_metadata(pivots_stream, pq_file_num_centroids, pq_file_dim, file_offset_data[0]);
+diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
+index c1ed55f..25bd4c8 100644
+--- a/extern/diskann/diskann.cmake
++++ b/extern/diskann/diskann.cmake
+@@ -35,7 +35,12 @@ set(DISKANN_SOURCES
+ #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
+ 
+ add_library(diskann STATIC ${DISKANN_SOURCES})
+-target_compile_options(diskann PRIVATE -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DENABLE_CUSTOM_LOGGER=1)
++if (MSVC)
++  target_compile_options(diskann PRIVATE /openmp /DENABLE_CUSTOM_LOGGER=1)
++  target_compile_definitions(diskann PRIVATE _WINDOWS NOMINMAX)
++else ()
++  target_compile_options(diskann PRIVATE -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DENABLE_CUSTOM_LOGGER=1)
++endif ()
+ set_property(TARGET diskann PROPERTY CXX_STANDARD 17)
+ add_dependencies(diskann boost openblas)
+ 
+diff --git a/extern/mkl/mkl.cmake b/extern/mkl/mkl.cmake
+index 0b402cc..857e572 100644
+--- a/extern/mkl/mkl.cmake
++++ b/extern/mkl/mkl.cmake
+@@ -58,11 +58,17 @@ if (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64" AND ENABLE_INTEL_MKL)
+     endforeach()
+     message ("enable intel-mkl as blas backend")
+ else ()
+-    set(BLAS_LIBRARIES libopenblas.a gfortran)
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+-        list(PREPEND BLAS_LIBRARIES omp)
+-    else()
+-        list(PREPEND BLAS_LIBRARIES gomp)
+-    endif()
++    if (WIN32)
++        set(BLAS_LIBRARIES ${CMAKE_BINARY_DIR}/openblas/install/lib/openblas.lib)
++    elseif (APPLE OR ANDROID)
++        set(BLAS_LIBRARIES ${CMAKE_BINARY_DIR}/openblas/install/lib/libopenblas.a)
++    else ()
++        set(BLAS_LIBRARIES libopenblas.a gfortran)
++        if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++            list(PREPEND BLAS_LIBRARIES omp)
++        else()
++            list(PREPEND BLAS_LIBRARIES gomp)
++        endif()
++    endif ()
+     message ("enable openblas as blas backend")
+ endif ()
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
+index 3db31ed..5faca37 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
-@@ -3,2 +3,7 @@
+@@ -1,9 +1,72 @@
+ 
+ set(name openblas)
  set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
++set(openblas_urls
++    https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.34
++    https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz
++    https://sourceforge.net/projects/openblas/files/v0.3.34/OpenBLAS-0.3.34.tar.gz/download
++)
 +if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 +    set(openblas_make_target TARGET=CORE2)
 +elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
 +    set(openblas_make_target TARGET=ARMV8)
 +endif ()
  set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
-@@ -24,5 +29,5 @@
+ 
+-ExternalProject_Add(
++if (WIN32 OR APPLE OR ANDROID)
++    # The upstream Make recipe assumes a GNU host toolchain. Its CMake build
++    # supports MSVC and propagates the Android and macOS target settings.
++    set(openblas_target ARMV8)
++    if (WIN32)
++        set(openblas_target CORE2)
++    endif ()
++    set(openblas_c_flags "${CMAKE_C_FLAGS}")
++    if (APPLE OR ANDROID)
++        # The bundled C LAPACK translation has legacy pointer-type warnings.
++        string(APPEND openblas_c_flags " -Wno-error=incompatible-pointer-types")
++    endif ()
++    ExternalProject_Add(
++        ${name}
++        URL ${openblas_urls}
++        URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
++        DOWNLOAD_NAME OpenBLAS-v0.3.34.tar.gz
++        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
++        SOURCE_DIR ${source_dir}
++        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${name}/build
++        CMAKE_ARGS ${common_cmake_args}
++            "-DCMAKE_C_FLAGS=${openblas_c_flags}"
++            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
++            -DCMAKE_INSTALL_PREFIX=${install_dir}
++            -DCMAKE_INSTALL_LIBDIR=lib
++            -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
++            -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
++            -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
++            -DBUILD_WITHOUT_LAPACK=OFF
++            -DC_LAPACK=ON
++            -DNO_LAPACKE=OFF
++            -DBUILD_TESTING=OFF
++            -DBUILD_STATIC_LIBS=ON
++            -DBUILD_SHARED_LIBS=OFF
++            -DNOFORTRAN=ON
++            -DUSE_THREAD=OFF
++            -DUSE_LOCKING=ON
++            -DDYNAMIC_ARCH=OFF
++            -DTARGET=${openblas_target}
++        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target openblas_static --parallel ${NUM_BUILDING_JOBS}
++        INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> --prefix ${install_dir}
++        LOG_CONFIGURE TRUE
++        LOG_BUILD TRUE
++        LOG_INSTALL TRUE
++        LOG_OUTPUT_ON_FAILURE TRUE
++        DOWNLOAD_NO_PROGRESS 1
++        INACTIVITY_TIMEOUT 5
++        TIMEOUT 90
++    )
++else ()
++    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
++        set(openblas_make_target TARGET=CORE2)
++    endif ()
++    ExternalProject_Add(
+     ${name}
+     URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.23/OpenBLAS-0.3.23.tar.gz
+         # this url is maintained by the vsag project, if it's broken, please try
+@@ -22,9 +85,9 @@ ExternalProject_Add(
+         OMP_NUM_THREADS=1
+         PATH=/usr/lib/ccache:$ENV{PATH}
          LD_LIBRARY_PATH=/opt/alibaba-cloud-compiler/lib64/:$ENV{LD_LIBRARY_PATH}
 -        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 -j${NUM_BUILDING_JOBS}
 +        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 ${openblas_make_target} -j${NUM_BUILDING_JOBS}
@@ -17,20 +838,480 @@ diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
 -        make DYNAMIC_ARCH=1 PREFIX=${install_dir} install
 +        make DYNAMIC_ARCH=1 ${openblas_make_target} PREFIX=${install_dir} install
      BUILD_IN_SOURCE 1
-diff --git a/CMakeLists.txt b/CMakeLists.txt
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -316,2 +316,3 @@
-         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
-+        -D VSAG_VERSION=v0.16.20
-         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
-@@ -320 +321,2 @@
- add_dependencies (vsag version)
-+add_dependencies (vsag_static version)
-diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
---- a/cmake/GenerateVersionHeader.cmake
-+++ b/cmake/GenerateVersionHeader.cmake
-@@ -1,2 +1,2 @@
--if(GIT_EXECUTABLE)
-+if(GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
-   get_filename_component(SRC_DIR ${SRC} DIRECTORY)
+     LOG_CONFIGURE TRUE
+     LOG_BUILD TRUE
+@@ -32,28 +95,12 @@ ExternalProject_Add(
+     DOWNLOAD_NO_PROGRESS 1
+     INACTIVITY_TIMEOUT 5
+     TIMEOUT 30
+-)
+-
+-include_directories(${install_dir}/include)
+-link_directories (${install_dir}/lib)
+-link_directories (${install_dir}/lib64)
+-
+-file(GLOB LIB_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib)
+-if(LIB_DIR_EXIST)
+-    file(GLOB LIB_FILES ${install_dir}/lib/lib*.a)
+-    foreach(lib_file ${LIB_FILES})
+-        install(FILES ${lib_file}
+-                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+     )
+-    endforeach()
+-endif()
++endif ()
+ 
+-file(GLOB LIB64_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib64)
+-if(LIB64_DIR_EXIST)
+-    file(GLOB LIB64_FILES ${install_dir}/lib64/lib*.a)
+-    foreach(lib64_file ${LIB64_FILES})
+-        install(FILES ${lib64_file}
+-                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-    )
+-    endforeach()
+-endif()
++include_directories(${install_dir}/include)
++if (WIN32 OR APPLE OR ANDROID)
++    # OpenBLAS CMake installs cblas.h under include/openblas.
++    include_directories(${install_dir}/include/openblas)
++endif ()
++link_directories(${install_dir}/lib)
+diff --git a/extern/roaringbitmap/roaringbitmap.cmake b/extern/roaringbitmap/roaringbitmap.cmake
+index 8a1729c..48d70ef 100644
+--- a/extern/roaringbitmap/roaringbitmap.cmake
++++ b/extern/roaringbitmap/roaringbitmap.cmake
+@@ -28,5 +28,7 @@ FetchContent_GetProperties(roaringbitmap)
+ if(NOT roaringbitmap_POPULATED)
+   FetchContent_Populate(roaringbitmap)
+   add_subdirectory(${roaringbitmap_SOURCE_DIR} ${roaringbitmap_BINARY_DIR} EXCLUDE_FROM_ALL)
+-  target_compile_options(roaring PRIVATE -Wno-unused-function)
++  if (NOT MSVC)
++    target_compile_options(roaring PRIVATE -Wno-unused-function)
++  endif ()
+ endif()
+diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
+index 371900a..bcbaf7d 100644
+--- a/extern/spdlog/spdlog.cmake
++++ b/extern/spdlog/spdlog.cmake
+@@ -16,7 +16,7 @@ ExternalProject_Add(
+     DOWNLOAD_DIR ${DOWNLOAD_DIR}
+     SOURCE_DIR ${source_dir}
+     CONFIGURE_COMMAND
+-    	cmake -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
+     BUILD_COMMAND
+ 	cmake --build build --target install --parallel 4
+     INSTALL_COMMAND
+diff --git a/include/vsag/allocator.h b/include/vsag/allocator.h
+index d21476b..cf7e269 100644
+--- a/include/vsag/allocator.h
++++ b/include/vsag/allocator.h
+@@ -14,10 +14,19 @@
+ 
+ #pragma once
+ 
++#include <cstddef>
++#include <cstdint>
+ #include <string>
+ 
+ namespace vsag {
+ 
++// seekdb overrides these methods with uint64_t on macOS.
++#if defined(__APPLE__)
++using AllocatorSize = uint64_t;
++#else
++using AllocatorSize = size_t;
++#endif
++
+ /**
+  * @class Allocator
+  * @brief An abstract base class for custom memory management.
+@@ -49,7 +58,7 @@ public:
+      * @return void* Pointer to the allocated memory block.
+      */
+     virtual void*
+-    Allocate(size_t size) = 0;
++    Allocate(AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Deallocates a previously allocated block of memory.
+@@ -73,7 +82,7 @@ public:
+      * @return void* Pointer to the reallocated memory block.
+      */
+     virtual void*
+-    Reallocate(void* p, size_t size) = 0;
++    Reallocate(void* p, AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Constructs a new object of type T.
+diff --git a/src/data_cell/flatten_interface.cpp b/src/data_cell/flatten_interface.cpp
+index b32e6d3..9a9d16e 100644
+--- a/src/data_cell/flatten_interface.cpp
++++ b/src/data_cell/flatten_interface.cpp
+@@ -121,10 +121,20 @@ FlattenInterface::MakeInstance(const FlattenInterfaceParamPtr& param,
+         return make_instance<BufferIO>(param, common_param);
+     }
+     if (io_type_name == IO_TYPE_VALUE_ASYNC_IO) {
++#ifdef HAVE_LIBAIO
+         return make_instance<AsyncIO>(param, common_param);
++#else
++        throw VsagException(ErrorType::UNSUPPORTED_INDEX_OPERATION,
++                            "Async IO requires Linux libaio");
++#endif
+     }
+     if (io_type_name == IO_TYPE_VALUE_MMAP_IO) {
++#if !defined(_WIN32) && !defined(__APPLE__)
+         return make_instance<MMapIO>(param, common_param);
++#else
++        throw VsagException(ErrorType::UNSUPPORTED_INDEX_OPERATION,
++                            "MMap IO is unavailable on this platform");
++#endif
+     }
+     if (io_type_name == IO_TYPE_VALUE_READER_IO) {
+         return make_instance<ReaderIO>(param, common_param);
+diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
+index b0791e0..e22a605 100644
+--- a/src/impl/allocator/default_allocator.cpp
++++ b/src/impl/allocator/default_allocator.cpp
+@@ -15,6 +15,7 @@
+ 
+ #include "default_allocator.h"
+ 
++#include <cstdlib>
+ #include <fmt/format.h>
+ 
+ #include "../../logger.h"
+@@ -24,7 +25,7 @@ namespace vsag {
+ DefaultAllocator::~DefaultAllocator() {
+     if (not allocated_ptrs_.empty()) {
+         logger::error(fmt::format("There is a memory leak in {}.", DefaultAllocator::Name()));
+-        abort();
++        std::abort();
+     }
+ }
+ #else
+@@ -32,8 +33,8 @@ DefaultAllocator::~DefaultAllocator() = default;
+ #endif
+ 
+ void*
+-DefaultAllocator::Allocate(size_t size) {
+-    auto* ptr = malloc(size);
++DefaultAllocator::Allocate(AllocatorSize size) {
++    auto* ptr = std::malloc(size);
+ #ifndef NDEBUG
+     std::lock_guard<std::mutex> guard(set_mutex_);
+     allocated_ptrs_.insert(ptr);
+@@ -54,11 +55,11 @@ DefaultAllocator::Deallocate(void* p) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    free(p);
++    std::free(p);
+ }
+ 
+ void*
+-DefaultAllocator::Reallocate(void* p, size_t size) {
++DefaultAllocator::Reallocate(void* p, AllocatorSize size) {
+ #ifndef NDEBUG
+     if (p == nullptr) {
+         return Allocate(size);
+@@ -70,7 +71,7 @@ DefaultAllocator::Reallocate(void* p, size_t size) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    auto* ptr = realloc(p, size);
++    auto* ptr = std::realloc(p, size);
+ #ifndef NDEBUG
+     allocated_ptrs_.insert(ptr);
+ #endif
+diff --git a/src/impl/allocator/default_allocator.h b/src/impl/allocator/default_allocator.h
+index 4cffca6..8c7497e 100644
+--- a/src/impl/allocator/default_allocator.h
++++ b/src/impl/allocator/default_allocator.h
+@@ -35,13 +35,13 @@ public:
+     Name() override;
+ 
+     void*
+-    Allocate(size_t size) override;
++    Allocate(AllocatorSize size) override;
+ 
+     void
+     Deallocate(void* p) override;
+ 
+     void*
+-    Reallocate(void* p, size_t size) override;
++    Reallocate(void* p, AllocatorSize size) override;
+ 
+ private:
+ #ifndef NDEBUG
+diff --git a/src/impl/allocator/safe_allocator.h b/src/impl/allocator/safe_allocator.h
+index 1977ed7..6eef685 100644
+--- a/src/impl/allocator/safe_allocator.h
++++ b/src/impl/allocator/safe_allocator.h
+@@ -47,7 +47,7 @@ public:
+     }
+ 
+     void*
+-    Allocate(size_t size) override {
++    Allocate(AllocatorSize size) override {
+         auto ret = raw_allocator_->Allocate(size);
+         if (not ret) {
+             throw std::bad_alloc();
+@@ -61,7 +61,7 @@ public:
+     }
+ 
+     void*
+-    Reallocate(void* p, size_t size) override {
++    Reallocate(void* p, AllocatorSize size) override {
+         auto ret = raw_allocator_->Reallocate(p, size);
+         if (not ret) {
+             throw std::bad_alloc();
+diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
+index 9ef752e..398138a 100644
+--- a/src/io/CMakeLists.txt
++++ b/src/io/CMakeLists.txt
+@@ -6,13 +6,23 @@ set (IO_SRC
+         buffer_io_parameter.cpp
+         buffer_io.cpp
+         async_io_parameter.cpp
+-        async_io.cpp
+         mmap_io_parameter.cpp
+         memory_block_io.cpp
+         reader_io.cpp
+         reader_io_parameter.cpp
+ )
+ 
++if (ENABLE_LIBAIO)
++    list (APPEND IO_SRC async_io.cpp)
++endif ()
++
+ add_library (io OBJECT ${IO_SRC})
+-target_link_libraries (io PUBLIC fmt::fmt aio coverage_config)
++target_link_libraries (io PUBLIC fmt::fmt coverage_config)
++if (ENABLE_LIBAIO)
++    target_link_libraries (io PUBLIC aio)
++endif ()
++if (APPLE)
++    add_library (io_static STATIC $<TARGET_OBJECTS:io>)
++    set_target_properties (io_static PROPERTIES OUTPUT_NAME io)
++endif ()
+ maybe_add_dependencies (io spdlog)
+diff --git a/src/io/buffer_io.cpp b/src/io/buffer_io.cpp
+index cdd86d1..0d14b9e 100644
+--- a/src/io/buffer_io.cpp
++++ b/src/io/buffer_io.cpp
+@@ -16,13 +16,32 @@
+ #include "buffer_io.h"
+ 
+ #include <fcntl.h>
++#if defined(_WIN32)
++#include <io.h>
++#include <share.h>
++#include <sys/stat.h>
++#else
+ #include <unistd.h>
++#endif
++
++#include <algorithm>
++#include <limits>
+ 
+ namespace vsag {
+ 
+ BufferIO::BufferIO(std::string filename, Allocator* allocator)
+     : BasicIO<BufferIO>(allocator), filepath_(std::move(filename)) {
++#if defined(_WIN32)
++    const int open_error = _sopen_s(&this->fd_, filepath_.c_str(),
++                                    _O_CREAT | _O_RDWR | _O_BINARY,
++                                    _SH_DENYNO, _S_IREAD | _S_IWRITE);
++    if (open_error != 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR,
++                            fmt::format("open file {} error {}", filepath_, open_error));
++    }
++#else
+     this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
++#endif
+ }
+ 
+ BufferIO::BufferIO(const BufferIOParameterPtr& io_param, const IndexCommonParam& common_param)
+@@ -33,7 +52,22 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
+ 
+ void
+ BufferIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+-    auto ret = pwrite64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before write failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int written = _write(this->fd_, data + ret, chunk);
++        if (written <= 0) break;
++        ret += written;
++    }
++#else
++    auto ret = pwrite(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("write bytes {} less than {}", ret, size));
+@@ -48,7 +82,22 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
+     if (size == 0) {
+         return true;
+     }
+-    auto ret = pread64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before read failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int received = _read(this->fd_, data + ret, chunk);
++        if (received <= 0) break;
++        ret += received;
++    }
++#else
++    auto ret = pread(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("read bytes {} less than {}", ret, size));
+diff --git a/src/io/buffer_io.h b/src/io/buffer_io.h
+index e707fa2..f620e6a 100644
+--- a/src/io/buffer_io.h
++++ b/src/io/buffer_io.h
+@@ -15,6 +15,13 @@
+ 
+ #pragma once
+ 
++#if defined(_WIN32)
++#include <io.h>
++#include <mutex>
++#else
++#include <unistd.h>
++#endif
++
+ #include "basic_io.h"
+ #include "buffer_io_parameter.h"
+ #include "index/index_common_param.h"
+@@ -33,7 +40,11 @@ public:
+     explicit BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param);
+ 
+     ~BufferIO() override {
++#if defined(_WIN32)
++        _close(this->fd_);
++#else
+         close(this->fd_);
++#endif
+         // remove file
+         std::filesystem::remove(this->filepath_);
+     }
+@@ -57,5 +68,9 @@ private:
+     std::string filepath_{};
+ 
+     int fd_{-1};
++
++#if defined(_WIN32)
++    mutable std::mutex io_mutex_;
++#endif
+ };
+ }  // namespace vsag
+diff --git a/src/io/io_headers.h b/src/io/io_headers.h
+index 98a09e6..57ebcf8 100644
+--- a/src/io/io_headers.h
++++ b/src/io/io_headers.h
+@@ -15,10 +15,14 @@
+ 
+ #pragma once
+ 
++#ifdef HAVE_LIBAIO
+ #include "async_io.h"
++#endif
+ #include "basic_io.h"
+ #include "buffer_io.h"
+ #include "memory_block_io.h"
+ #include "memory_io.h"
++#if !defined(_WIN32) && !defined(__APPLE__)
+ #include "mmap_io.h"
++#endif
+ #include "reader_io.h"
+diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
+index 38eb4cc..0b0b9c7 100644
+--- a/src/simd/CMakeLists.txt
++++ b/src/simd/CMakeLists.txt
+@@ -26,7 +26,7 @@ if (DIST_CONTAINS_SSE)
+     set_source_files_properties (
+             sse.cpp
+             PROPERTIES COMPILE_FLAGS
+-            "-msse -msse2 -msse3 -mssse3 -msse4 -msse4a -msse4.1 -msse4.2")
++            "-msse -msse2 -msse3 -mssse3 -msse4a -msse4.1 -msse4.2")
+ endif ()
+ if (DIST_CONTAINS_AVX)
+     set_source_files_properties (avx.cpp PROPERTIES COMPILE_FLAGS "-mavx -mf16c")
+@@ -39,7 +39,7 @@ if (DIST_CONTAINS_AVX512)
+             avx512.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
+     )
+ endif ()
+ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+@@ -47,13 +47,14 @@ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+             avx512vpopcntdq.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
+     )
+ endif ()
+ if (DIST_CONTAINS_NEON)
+     set_source_files_properties (neon.cpp PROPERTIES COMPILE_FLAGS "-march=armv8-a")
+ endif ()
+ 
++if (NOT MSVC)
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorize")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-malloc")
+@@ -62,6 +63,9 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-realloc")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-free")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -fopenmp-simd")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops")
++else ()
++set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /openmp")
++endif ()
+ 
+ add_library (simd STATIC ${SIMD_SRCS})
+ 
+diff --git a/src/simd/sse.cpp b/src/simd/sse.cpp
+index a8d3bca..2f36ebc 100644
+--- a/src/simd/sse.cpp
++++ b/src/simd/sse.cpp
+@@ -814,7 +814,7 @@ Normalize(const float* from, float* to, uint64_t dim) {
+ void
+ Prefetch(const void* data) {
+ #if defined(ENABLE_SSE)
+-    _mm_prefetch(data, _MM_HINT_T0);
++    _mm_prefetch(reinterpret_cast<const char*>(data), _MM_HINT_T0);
+ #endif
+ };
+ 
+diff --git a/src/storage/stream_reader.cpp b/src/storage/stream_reader.cpp
+index f8344f3..8311edf 100644
+--- a/src/storage/stream_reader.cpp
++++ b/src/storage/stream_reader.cpp
+@@ -125,7 +125,8 @@ BufferStreamReader::Read(char* data, uint64_t size) {
+ 
+         // If there is available data in buffer_, copy it to dest
+         if (available_in_src > 0) {
+-            size_t bytes_to_copy = std::min(size - total_copied, available_in_src);
++            size_t bytes_to_copy =
++                static_cast<size_t>(std::min<uint64_t>(size - total_copied, available_in_src));
+             memcpy(data + total_copied, buffer_ + buffer_cursor_, bytes_to_copy);
+             total_copied += bytes_to_copy;
+             buffer_cursor_ += bytes_to_copy;

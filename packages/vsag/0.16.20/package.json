@@ -4,7 +4,10 @@
   "version": "0.16.20",
   "supported_targets": [
     "linux-x86_64-glibc217",
-    "linux-aarch64-glibc217"
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
   ],
   "build_dependencies": {
     "linux": {
@@ -40,6 +43,47 @@
       "lib/libfmt.a",
       "lib/libgfortran_static.a",
       "lib/libgomp_static.a"
+    ],
+    "macos": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libio.a",
+      "lib/libomp_static.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libgfortran_static.a",
+      "lib/libquadmath_static.a",
+      "lib/libgcc.a"
+    ],
+    "windows": [
+      "include/vsag/vsag.h",
+      "lib/vsag_static.lib",
+      "lib/simd.lib",
+      "lib/cpuinfo.lib",
+      "lib/diskann.lib",
+      "lib/openblas.lib",
+      "lib/libomp.lib",
+      "bin/libomp.dll",
+      "lib/antlr4-runtime-static.lib",
+      "lib/antlr4-autogen.lib",
+      "lib/fmt.lib"
+    ],
+    "android": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libspdlog.a"
     ]
   }
 }
