@@ -1466,6 +1466,17 @@ index 85c32ca..2afa243 100644
 -}  // namespace vsag
 \ No newline at end of file
 +}  // namespace vsag
+diff --git a/src/reader.cpp b/src/reader.cpp
+index 9fe1310..93a88ac 100644
+--- a/src/reader.cpp
++++ b/src/reader.cpp
+@@ -1,5 +1,6 @@
+ #include <fmt/format.h>
+ 
++#include <atomic>
+ #include <future>
+ 
+ #include "vsag/readerset.h"
 diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
 index 38eb4cc..0b0b9c7 100644
 --- a/src/simd/CMakeLists.txt
