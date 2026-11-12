@@ -264,6 +264,14 @@ def build(ctx):
             _verify_wasm_archive(ctx, archive)
         ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
+    if ctx.target.family == "wasm":
+        undefined = subprocess.check_output(
+            ["llvm-nm", "--undefined-only", *map(str, staged_libraries)],
+            env=ctx.environment, text=True,
+        )
+        openmp = re.findall(r"\bU (omp_\w+)", undefined)
+        if openmp:
+            raise ValueError("WebAssembly archives require OpenMP runtime: " + ", ".join(sorted(set(openmp))))
     if ctx.target.family in ("macos", "ios"):
         io_archive = _built_library(ctx, ("src/io/libio.a",))
         if ctx.target.family == "ios":

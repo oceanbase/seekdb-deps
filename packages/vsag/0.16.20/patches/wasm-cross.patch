@@ -14,6 +14,22 @@ index 0e2a211..c629c35 100644
          set (CMAKE_CXX_STANDARD 20)
      endif ()
  endif ()
+diff --git a/extern/diskann/DiskANN/include/parameters.h b/extern/diskann/DiskANN/include/parameters.h
+index 81a336d..02f7993 100644
+--- a/extern/diskann/DiskANN/include/parameters.h
++++ b/extern/diskann/DiskANN/include/parameters.h
+@@ -72,7 +72,11 @@ class IndexWriteParametersBuilder
+ 
+     IndexWriteParametersBuilder &with_num_threads(const uint32_t num_threads)
+     {
++#ifdef __EMSCRIPTEN__
++        _num_threads = num_threads == 0 ? 1 : num_threads;
++#else
+         _num_threads = num_threads == 0 ? omp_get_num_threads() : num_threads;
++#endif
+         return *this;
+     }
+ 
 diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
 index d4f8d51..285fa87 100644
 --- a/extern/diskann/DiskANN/include/utils.h
@@ -36,6 +52,51 @@ index d4f8d51..285fa87 100644
          auto ret = std::to_string(strerror_r(errno, buff, 1024));
  #else
          auto ret = std::string(strerror_r(errno, buff, 1024));
+diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
+index 24f62bd..4ea75e4 100644
+--- a/extern/diskann/DiskANN/src/disk_utils.cpp
++++ b/extern/diskann/DiskANN/src/disk_utils.cpp
+@@ -1311,11 +1311,13 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+     }
+     uint32_t num_threads = (uint32_t)atoi(param_list[4].c_str());
+ 
++#ifndef __EMSCRIPTEN__
+     if (num_threads != 0)
+     {
+         omp_set_num_threads(num_threads);
+         // mkl_set_num_threads(num_threads);
+     }
++#endif
+ 
+     diskann::cout << "Starting index build: R=" << R << " L=" << L << " Query RAM budget: " << final_index_ram_limit
+                   << " Indexing ram budget: " << indexing_ram_budget << " T: " << num_threads << std::endl;
+diff --git a/extern/diskann/DiskANN/src/index.cpp b/extern/diskann/DiskANN/src/index.cpp
+index 38c02b8..47b06f1 100644
+--- a/extern/diskann/DiskANN/src/index.cpp
++++ b/extern/diskann/DiskANN/src/index.cpp
+@@ -1744,8 +1744,10 @@ template <typename T, typename TagT, typename LabelT>
+ void Index<T, TagT, LabelT>::link(const IndexWriteParameters &parameters)
+ {
+     uint32_t num_threads = parameters.num_threads;
++#ifndef __EMSCRIPTEN__
+     if (num_threads != 0)
+         omp_set_num_threads(num_threads);
++#endif
+ 
+     _saturate_graph = parameters.saturate_graph;
+ 
+@@ -3000,7 +3002,11 @@ consolidation_report Index<T, TagT, LabelT>::consolidate_deletes(const IndexWrit
+     const uint32_t range = params.max_degree;
+     const uint32_t maxc = params.max_occlusion_size;
+     const float alpha = params.alpha;
++#ifdef __EMSCRIPTEN__
++    const uint32_t num_threads = params.num_threads == 0 ? 1 : params.num_threads;
++#else
+     const uint32_t num_threads = params.num_threads == 0 ? omp_get_num_threads() : params.num_threads;
++#endif
+ 
+     uint32_t num_calls_to_process_delete = 0;
+     diskann::Timer timer;
 diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
 index 25bd4c8..599ec26 100644
 --- a/extern/diskann/diskann.cmake
