@@ -1301,6 +1301,18 @@ index a8d3bca..2f36ebc 100644
  #endif
  };
  
+diff --git a/src/storage/serialization.cpp b/src/storage/serialization.cpp
+index 812d215..d920273 100644
+--- a/src/storage/serialization.cpp
++++ b/src/storage/serialization.cpp
+@@ -16,6 +16,7 @@
+ #include "serialization.h"
+ 
+ #include <cstring>
++#include <sstream>
+ namespace vsag {
+ 
+ void
 diff --git a/src/storage/stream_reader.cpp b/src/storage/stream_reader.cpp
 index f8344f3..8311edf 100644
 --- a/src/storage/stream_reader.cpp
