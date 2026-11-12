@@ -1025,6 +1025,28 @@ index d255712..26a5995 100644
                  const vsag::FilterPtr is_id_allowed = nullptr) const override;
  
      void
+diff --git a/src/algorithm/hnswlib/hnswalg_static.h b/src/algorithm/hnswlib/hnswalg_static.h
+index 89ec572..0c899a5 100644
+--- a/src/algorithm/hnswlib/hnswalg_static.h
++++ b/src/algorithm/hnswlib/hnswalg_static.h
+@@ -1405,7 +1405,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::Allocator* allocator = nullptr,
+@@ -1485,7 +1485,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override {
+         std::runtime_error("static hnsw does not support range search");
+         //        std::priority_queue<std::pair<float, LabelType>> result;
 diff --git a/src/algorithm/ivf_partition/gno_imi_partition.cpp b/src/algorithm/ivf_partition/gno_imi_partition.cpp
 index c232934..fb155e4 100644
 --- a/src/algorithm/ivf_partition/gno_imi_partition.cpp
