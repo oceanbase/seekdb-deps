@@ -15,7 +15,7 @@ index 25bd4c8..599ec26 100644
  set_property(TARGET diskann PROPERTY CXX_STANDARD 17)
  add_dependencies(diskann boost openblas)
 diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
-index f66fc46..ab99524 100644
+index f66fc46..96578b4 100644
 --- a/extern/openblas/openblas.cmake
 +++ b/extern/openblas/openblas.cmake
 @@ -13,12 +13,14 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
@@ -30,7 +30,7 @@ index f66fc46..ab99524 100644
      if (WIN32)
          set(openblas_target CORE2)
 +    elseif (EMSCRIPTEN)
-+        set(openblas_target GENERIC)
++        set(openblas_target WASM128_GENERIC)
      endif ()
      set(openblas_c_flags "${CMAKE_C_FLAGS}")
      if (APPLE OR ANDROID)
