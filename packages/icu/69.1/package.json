@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "name": "icu",
+  "version": "69.1",
+  "source": {
+    "path": "source",
+    "url": "https://github.com/unicode-org/icu/releases/download/release-69-1/icu4c-69_1-src.tgz",
+    "repository": "https://github.com/unicode-org/icu.git",
+    "tag": "release-69-1",
+    "revision": "0e7b4428866f3133b4abba2d932ee3faa708db1d",
+    "archive_sha256": "4cba7b7acd1d3c42c44bb0c14be6637098c7faf2b330ce876bc5f3b915d09745",
+    "strip_prefix": "icu"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Unicode-3.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/unicode/utypes.h",
+      "lib/libicuuc.a",
+      "lib/libicui18n.a",
+      "lib/libicudata.a",
+      "lib/libicustubdata.a"
+    ],
+    "windows": [
+      "include/unicode/utypes.h",
+      "lib/icuuc.lib",
+      "lib/icuin.lib",
+      "lib/icudt.lib"
+    ]
+  }
+}
