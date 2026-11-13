@@ -126,6 +126,20 @@ jobs:
         if: ${{ matrix.target.family != 'linux' }}
         run: python -m pip install --disable-pip-version-check cmake ninja
 
+      - uses: msys2/setup-msys2@v2
+        id: jemalloc_msys2
+        if: ${{ matrix.target.family == 'windows' && inputs.package == 'jemalloc' && inputs.version == '5.3.1' }}
+        with:
+          msystem: MSYS
+          install: make
+
+      - name: Expose jemalloc MSYS2 tools
+        if: ${{ matrix.target.family == 'windows' && inputs.package == 'jemalloc' && inputs.version == '5.3.1' }}
+        shell: pwsh
+        env:
+          MSYS2_LOCATION: ${{ steps.jemalloc_msys2.outputs.msys2-location }}
+        run: '"MSYS2_LOCATION=$env:MSYS2_LOCATION" >> $env:GITHUB_ENV'
+
       - name: Select Apple VSAG OpenMP compiler
         if: ${{ (matrix.target.family == 'macos' || matrix.target.family == 'ios') && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
         shell: bash

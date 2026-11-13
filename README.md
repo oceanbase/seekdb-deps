@@ -64,6 +64,8 @@ Profiles describe target ABI, target C flags where applicable, and supported bui
 
 Profiles are build contracts, not validation claims. The zlib 1.4 recipe builds only upstream's `zlibstatic` target and stages the static library and public headers. Linux aarch64, macOS, Windows, and Android profiles have not been built.
 
+The jemalloc 5.3.1 recipe uses the official GitHub release archive. It builds the static library with stats enabled and the `je_` API prefix, and packages the generated header and library. The Linux and Android builds disable jemalloc's initial-exec TLS requirement for embedded-library loading. The Windows package uses the static MSVC runtime (`/MT`).
+
 ## Licensing
 
 Files maintained specifically for this repository are licensed under Apache License 2.0. Third-party dependencies retain their own licenses and notices; each binary package includes the dependency license under `share/licenses/<name>/LICENSE`.

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "name": "jemalloc",
+  "version": "5.3.1",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
+  ],
+  "source": {
+    "path": "source",
+    "repository": "https://github.com/jemalloc/jemalloc",
+    "tag": "5.3.1",
+    "revision": "81034ce1f1373e37dc865038e1bc8eeecf559ce8",
+    "url": "https://github.com/jemalloc/jemalloc/releases/download/5.3.1/jemalloc-5.3.1.tar.bz2",
+    "archive_sha256": "3826bc80232f22ed5c4662f3034f799ca316e819103bdc7bb99018a421706f92",
+    "strip_prefix": "jemalloc-5.3.1"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "BSD-2-Clause",
+    "source_path": "COPYING"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/jemalloc/jemalloc.h",
+      "lib/libjemalloc_pic.a",
+      "share/licenses/jemalloc/LICENSE"
+    ],
+    "windows": [
+      "include/jemalloc/jemalloc.h",
+      "lib/jemalloc.lib",
+      "share/licenses/jemalloc/LICENSE"
+    ]
+  }
+}
