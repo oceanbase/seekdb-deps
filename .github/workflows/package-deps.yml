@@ -126,16 +126,6 @@ jobs:
         if: ${{ matrix.target.family != 'linux' }}
         run: python -m pip install --disable-pip-version-check cmake ninja
 
-      - name: Install Rust for jemalloc
-        if: ${{ inputs.package == 'jemalloc' && inputs.version == '5.3.1' }}
-        shell: bash
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal
-          rustup default 1.97.1
-          if [ "${{ matrix.target.family }}" = android ]; then
-            rustup target add aarch64-linux-android
-          fi
-
       - uses: msys2/setup-msys2@v2
         id: jemalloc_msys2
         if: ${{ matrix.target.family == 'windows' && inputs.package == 'jemalloc' && inputs.version == '5.3.1' }}

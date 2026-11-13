@@ -10,31 +10,30 @@
     "android-arm64-v8a-api26"
   ],
   "source": {
-    "kind": "cargo_registry",
     "path": "source",
-    "registry": "https://crates.io",
-    "crate": "seekdb-jemalloc-sys",
-    "crate_version": "0.2.3+5.3.1",
-    "url": "https://static.crates.io/crates/seekdb-jemalloc-sys/seekdb-jemalloc-sys-0.2.3+5.3.1.crate",
-    "archive_sha256": "278734e47d644d7b861744a38d037b7f9847ef59c38d9f45e27e578db9a21ebe",
-    "strip_prefix": "seekdb-jemalloc-sys-0.2.3+5.3.1"
+    "repository": "https://github.com/jemalloc/jemalloc",
+    "tag": "5.3.1",
+    "revision": "81034ce1f1373e37dc865038e1bc8eeecf559ce8",
+    "url": "https://github.com/jemalloc/jemalloc/releases/download/5.3.1/jemalloc-5.3.1.tar.bz2",
+    "archive_sha256": "3826bc80232f22ed5c4662f3034f799ca316e819103bdc7bb99018a421706f92",
+    "strip_prefix": "jemalloc-5.3.1"
   },
   "recipe": "recipes/build.py",
   "patches": [],
   "license": {
-    "spdx_id": "Apache-2.0 AND BSD-2-Clause",
-    "source_path": "LICENSE"
+    "spdx_id": "BSD-2-Clause",
+    "source_path": "COPYING"
   },
   "required_artifacts": {
     "default": [
       "include/jemalloc/jemalloc.h",
       "lib/libjemalloc_pic.a",
-      "share/licenses/jemalloc/COPYING"
+      "share/licenses/jemalloc/LICENSE"
     ],
     "windows": [
       "include/jemalloc/jemalloc.h",
       "lib/jemalloc.lib",
-      "share/licenses/jemalloc/COPYING"
+      "share/licenses/jemalloc/LICENSE"
     ]
   }
 }

@@ -73,28 +73,16 @@ def package_paths(name, version):
     for field in ("source", "recipe", "license", "required_artifacts"):
         if field not in metadata:
             raise ValueError("Package metadata is missing field: " + field)
-    source = metadata["source"]
-    kind = source.get("kind", "git")
-    fields = ("path", "url", "archive_sha256", "strip_prefix")
-    if kind == "git":
-        fields += ("repository", "tag", "revision")
-    elif kind == "cargo_registry":
-        fields += ("registry", "crate", "crate_version")
-    else:
-        raise ValueError("Unsupported package source kind: " + str(kind))
-    for field in fields:
+    for field in ("path", "url", "repository", "tag", "revision", "archive_sha256", "strip_prefix"):
         if field not in metadata["source"]:
             raise ValueError("Package source metadata is missing field: " + field)
+    source = metadata["source"]
     if not source["url"].startswith("https://"):
         raise ValueError("Package source URL must use HTTPS")
     safe_relative(source["path"], "source.path")
     safe_relative(source["strip_prefix"], "source.strip_prefix")
-    if kind == "git" and not re.fullmatch(r"[0-9a-fA-F]{40,64}", source["revision"]):
+    if not re.match(r"^[0-9a-fA-F]{40,64}$", source["revision"]):
         raise ValueError("Package source revision must be a Git object id")
-    if kind == "cargo_registry" and (source["registry"] != "https://crates.io"
-            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", source["crate"])
-            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]*", source["crate_version"])):
-        raise ValueError("Invalid Cargo registry package coordinates")
     if not re.match(r"^[0-9a-fA-F]{64}$", source["archive_sha256"]):
         raise ValueError("Package source archive_sha256 must be a SHA256 digest")
     for field in ("spdx_id", "source_path"):
@@ -234,7 +222,6 @@ def extract_source_archive(archive_path, destination, strip_prefix):
 
 def source_revision(package_root, metadata, repo_checkout, workspace):
     source = metadata["source"]
-    source_id = source.get("revision", source["archive_sha256"])
     source_dir = (package_root / safe_relative(source["path"], "source.path")).resolve()
     try:
         source_dir.relative_to(package_root.resolve())
@@ -243,32 +230,29 @@ def source_revision(package_root, metadata, repo_checkout, workspace):
     if not repo_checkout:
         document = verify_manifest(ROOT, expected_type="source")
         upstream = document.get("upstream", {})
-        if upstream != upstream_record(metadata, source_id):
+        if (upstream.get("revision") != source["revision"]
+                or upstream.get("archive_sha256") != source["archive_sha256"]):
             raise ValueError("Source bundle and package metadata upstream pins do not match")
         if not source_dir.is_dir():
             raise ValueError("Pinned upstream source is missing: " + str(source_dir))
-        return source_id, source_dir
+        return source["revision"], source_dir
 
     workspace.mkdir(parents=True, exist_ok=True)
     archive_path = download_source_archive(source, workspace)
     source_dir = workspace / "source"
     extract_source_archive(archive_path, source_dir, source["strip_prefix"])
-    return source_id, source_dir
+    return source["revision"], source_dir
 
 
 def upstream_record(metadata, source_revision_sha):
     source = metadata["source"]
-    record = {
+    return {
+        "repository": source["repository"],
         "url": source["url"],
+        "tag": source["tag"],
+        "revision": source_revision_sha,
         "archive_sha256": source["archive_sha256"],
     }
-    if source.get("kind", "git") == "cargo_registry":
-        record.update({"kind": "cargo_registry", "registry": source["registry"],
-                       "crate": source["crate"], "version": source["crate_version"]})
-    else:
-        record.update({"repository": source["repository"], "tag": source["tag"],
-                       "revision": source_revision_sha})
-    return record
 
 
 def patch_records(package_root, metadata):

@@ -1,9 +1,8 @@
-"""Build the C/C++ jemalloc archive from seekdb's pinned Cargo crate."""
+"""Build the official jemalloc 5.3.1 release with its configure and Makefile."""
 
 import os
 from pathlib import Path
 import re
-import subprocess
 
 
 def _android_tools(ctx):
@@ -24,15 +23,21 @@ def _android_tools(ctx):
 
 def build(ctx):
     family = ctx.target.family
-    output_dir = ctx.build_dir / "native-output"
-    output_dir.mkdir(parents=True)
-    environment = {
-        "CARGO_TARGET_DIR": str(ctx.build_dir / "cargo-target"),
-        "JEMALLOC_SYS_OUTPUT_DIR": str(output_dir),
-        "NUM_JOBS": str(ctx.jobs),
-    }
-    configure = ["--with-jemalloc-prefix=je_"]
+    ctx.build_dir.mkdir(parents=True, exist_ok=True)
+    environment = {}
+    configure = [
+        "--with-version=VERSION",
+        "--enable-static",
+        "--disable-shared",
+        "--disable-cxx",
+        "--disable-doc",
+        "--enable-stats",
+        "--with-jemalloc-prefix=je_",
+    ]
     flags = list(ctx.target.document.get("cflags", []))
+    shell = "sh"
+    make = "make"
+
     if family == "linux":
         configure.append("--disable-initial-exec-tls")
     elif family == "macos":
@@ -45,14 +50,13 @@ def build(ctx):
         if any(flag[2:4].upper() != runtime or flag.lower().endswith("d")
                for flag in existing_runtime):
             raise ValueError("CFLAGS conflicts with Windows target CRT: /" + runtime)
-        flags.extend(["/O2", "/" + ctx.target.document["abi"]["runtime"],
-                      "/D_WIN32_WINNT=0x0A00"])
+        flags.extend(["/O2", "/" + runtime, "/D_WIN32_WINNT=0x0A00"])
         msys2_root = ctx.environment.get("MSYS2_LOCATION")
         if not msys2_root:
             raise ValueError("Windows jemalloc builds require MSYS2_LOCATION")
         tools = Path(msys2_root) / "usr/bin"
-        environment["JEMALLOC_SYS_SHELL"] = str(tools / "sh.exe")
-        environment["JEMALLOC_SYS_MAKE"] = str(tools / "make.exe")
+        shell = str(tools / "sh.exe")
+        make = str(tools / "make.exe")
         environment["MSYS2_ARG_CONV_EXCL"] = "*"
         environment["PATH"] = str(tools) + os.pathsep + ctx.environment["PATH"]
     elif family == "android":
@@ -65,21 +69,24 @@ def build(ctx):
 
     if flags or ctx.environment.get("CFLAGS"):
         environment["CFLAGS"] = " ".join(flags + [ctx.environment.get("CFLAGS", "")]).strip()
-    environment["JEMALLOC_SYS_CONFIGURE_ARGS"] = "\n".join(configure)
     ctx.observed_build_environment.update({
-        "cargo_version": subprocess.check_output(["cargo", "--version"],
-                                                env=ctx.environment, text=True).strip(),
-        "jemalloc_features": ["stats"],
         "jemalloc_configure_args": configure,
         "jemalloc_cflags": environment.get("CFLAGS", ""),
     })
-    command = ["cargo", "build", "--manifest-path", ctx.source_dir / "Cargo.toml",
-               "--locked", "--offline", "--release", "--features", "stats"]
-    if family == "android":
-        command.extend(["--target", "aarch64-linux-android"])
-    ctx.run(command, env=environment)
+    configure_script = (ctx.source_dir / "configure").as_posix()
+    ctx.run([shell, configure_script, *configure], env=environment)
+    ctx.run([make, "-j{}".format(ctx.jobs), "build_lib_static"], env=environment)
 
-    library = "jemalloc.lib" if family == "windows" else "libjemalloc_pic.a"
-    ctx.install(output_dir / "lib" / library, "lib/" + library)
-    ctx.install(output_dir / "include/jemalloc/jemalloc.h", "include/jemalloc/jemalloc.h")
-    ctx.install(ctx.source_dir / "vendor/jemalloc/COPYING", "share/licenses/jemalloc/COPYING")
+    library_dir = ctx.build_dir / "lib"
+    if family == "windows":
+        candidates = [library_dir / name for name in
+                      ("jemalloc_pic.lib", "jemalloc_s.lib", "jemalloc.lib")]
+        library = next((path for path in candidates if path.is_file()), None)
+        output_name = "jemalloc.lib"
+    else:
+        library = library_dir / "libjemalloc_pic.a"
+        output_name = library.name
+    if library is None or not library.is_file():
+        raise ValueError("jemalloc static archive is missing from " + str(library_dir))
+    ctx.install(library, "lib/" + output_name)
+    ctx.install(ctx.build_dir / "include/jemalloc/jemalloc.h", "include/jemalloc/jemalloc.h")

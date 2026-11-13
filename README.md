@@ -8,7 +8,7 @@ This repository contains pinned third-party source archive references, package-s
 packages/<name>/<version>/
   recipes/build.py        only package-specific build and file selection
   patches/                ordered package patches, when needed
-  package.json            source identity, URL, archive checksum, license, and outputs
+  package.json            source URL, revision, archive checksum, license, and outputs
   source/                 fetched source; included in source bundles, not stored in Git
 scripts/
   package.py              source/binary release orchestration
@@ -18,7 +18,7 @@ scripts/
 platforms/<target>.json   target ABI, C flags, and supported build hosts
 ```
 
-Package recipes use `RecipeContext.cmake(...)` for the configure/build lifecycle, `ctx.run(...)` for an upstream-specific command, and `ctx.install(source, relative_path)` to add an output to the package. They do not manage temporary directories, patches, license placement, manifests, checksums, or archives. The package runner initializes the build environment before downloading source or invoking a recipe. `scripts/init_build_env.py` selects or loads host compiler settings, checks minimum tool versions, and prepares the target-specific CMake arguments. Sources can be pinned Git release archives or crates.io packages; a Cargo package records its registry name, version, and archive checksum instead of a Git revision.
+Package recipes use `RecipeContext.cmake(...)` for the configure/build lifecycle, `ctx.run(...)` for an upstream-specific command, and `ctx.install(source, relative_path)` to add an output to the package. They do not manage temporary directories, patches, license placement, manifests, checksums, or archives. The package runner initializes the build environment before downloading source or invoking a recipe. `scripts/init_build_env.py` selects or loads host compiler settings, checks minimum tool versions, and prepares the target-specific CMake arguments.
 
 Binary archives have one package-version directory containing relative `include/`, `lib/`, `bin/`, and `share/` paths. They have no fixed installation prefix; consumers extract the archive into their chosen dependency directory. Build workspaces and staging files are created under temporary output directories, not under the checked-out package sources.
 
@@ -64,7 +64,7 @@ Profiles describe target ABI, target C flags where applicable, and supported bui
 
 Profiles are build contracts, not validation claims. The zlib 1.4 recipe builds only upstream's `zlibstatic` target and stages the static library and public headers. Linux aarch64, macOS, Windows, and Android profiles have not been built.
 
-The jemalloc 5.3.1 recipe uses the `seekdb-jemalloc-sys` 0.2.3+5.3.1 crate pinned in seekdb's `deps/external/Cargo.lock`. Cargo runs the crate's build script with the `stats` feature and the `je_` API prefix. The binary package contains the generated C/C++ header and native static archive; it does not contain a Rust library. The Linux and Android builds disable jemalloc's initial-exec TLS requirement for embedded-library loading. The Windows package uses the static MSVC runtime (`/MT`).
+The jemalloc 5.3.1 recipe uses the official GitHub release archive. It builds the static library with stats enabled and the `je_` API prefix, and packages the generated header and library. The Linux and Android builds disable jemalloc's initial-exec TLS requirement for embedded-library loading. The Windows package uses the static MSVC runtime (`/MT`).
 
 ## Licensing
 
