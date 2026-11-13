@@ -1,0 +1,1885 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8846f0ad..89e4d708 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -26,6 +26,10 @@ project (VSAG
+         LANGUAGES C CXX
+ )
+ 
++if (WIN32)
++    add_compile_definitions (NOMINMAX)
++endif ()
++
+ include (cmake/ColorizeMessage.cmake)
+ 
+ message (STATUS "CPU ARCH: ${Yellow}${CMAKE_HOST_SYSTEM_PROCESSOR}${CR}")
+@@ -86,14 +90,22 @@ else ()
+ endif ()
+ 
+ if (ENABLE_WERROR)
+-    add_compile_options (-Werror)
++    if (MSVC)
++        add_compile_options (/WX)
++    else ()
++        add_compile_options (-Werror)
++    endif ()
+ endif ()
+ 
+-vsag_add_exe_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-static-libstdc++)
+-vsag_add_shared_linker_flag (-fvisibility=hidden)
++if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
++    vsag_add_exe_linker_flag (-static-libstdc++)
++    vsag_add_shared_linker_flag (-static-libstdc++)
++endif ()
++if (NOT WIN32)
++    vsag_add_shared_linker_flag (-fvisibility=hidden)
++endif ()
+ 
+-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT WIN32)
+     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -gdwarf-4")
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gdwarf-4")
+ 
+@@ -128,7 +140,7 @@ if (ENABLE_LIBCXX)
+         message (FATAL_ERROR "libc++ or libc++abi not found")
+     endif ()
+ else ()
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
+     endif ()
+ endif ()
+@@ -161,8 +173,10 @@ if (CCACHE_FOUND AND ENABLE_CCACHE)
+     set_property (GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+ endif ()
+ 
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+ 
+ set (ld_flags
+         "-L${CMAKE_INSTALL_PREFIX}/lib"
+@@ -188,20 +202,42 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
+ endif ()
+ string (JOIN " " ld_flags ${ld_flags})
+ 
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++if (NOT WIN32)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
++endif ()
+ 
+ set (common_cmake_args
+         "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+         "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+         "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+-        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
+-        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fPIC -gdwarf-4 "
++        "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
++        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
+         "-DCMAKE_EXE_LINKER_FLAGS=${extra_link_libs}"
+         "-DCMAKE_SHARED_LINKER_FLAGS=${extra_link_libs}"
+         "-DCMAKE_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include"
+         "-DCMAKE_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib:/opt/alibaba-cloud-compiler/lib64"
+ )
++if (APPLE)
++    list (APPEND common_cmake_args
++        "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
++        "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
++        "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}")
++endif ()
++if (MSVC)
++    list (APPEND common_cmake_args
++        "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW"
++        "-DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}")
++endif ()
++if (CMAKE_TOOLCHAIN_FILE)
++    list (APPEND common_cmake_args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
++endif ()
++if (ANDROID)
++    list (APPEND common_cmake_args
++        "-DANDROID_ABI=${ANDROID_ABI}"
++        "-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
++        "-DANDROID_NDK=${ANDROID_NDK}")
++endif ()
+ 
+ set (common_configure_envs
+         "env"
+@@ -231,7 +262,9 @@ include (extern/openblas/openblas.cmake)
+ include (extern/mkl/mkl.cmake)
+ include (extern/diskann/diskann.cmake)
+ include (extern/spdlog/spdlog.cmake)
+-include (extern/catch2/catch2.cmake)
++if (ENABLE_TESTS)
++    include (extern/catch2/catch2.cmake)
++endif ()
+ include (extern/cpuinfo/cpuinfo.cmake)
+ include (extern/fmt/fmt.cmake)
+ include (extern/thread_pool/thread_pool.cmake)
+@@ -255,18 +288,27 @@ set (CMAKE_CXX_STANDARD 17)
+ set (CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+-    if (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17)
++    if (APPLE)
++        # Boost 1.67 uses a pragma that newer Clang diagnoses under -Werror.
++        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pragma-clang-attribute")
++    endif ()
++    # Bundled fmt 10.2.1 fails C++20 compile-time format checks with the
++    # macOS and Windows Clang toolchains used for these packages. VSAG's
++    # baseline is C++17, so keep those targets on that baseline.
++    if (NOT APPLE AND NOT WIN32 AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 17 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 17))
+         set (CMAKE_CXX_STANDARD 20)
+     endif ()
+ endif ()
+ 
+ # debug or release or sanitize
+-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
+-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
++if (NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Werror=suggest-override")
++endif ()
++if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Ofast")
+-elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3")
++elseif (CMAKE_BUILD_TYPE STREQUAL "Sanitize" AND NOT MSVC)
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
+ endif ()
+ 
+@@ -320,7 +362,9 @@ endif ()
+ 
+ # sources
+ add_subdirectory (src)
+-add_subdirectory (mockimpl)
++if (ENABLE_TESTS)
++    add_subdirectory (mockimpl)
++endif ()
+ if (ENABLE_EXAMPLES)
+     add_subdirectory (examples/cpp)
+ endif ()
+@@ -375,9 +419,10 @@ endif ()
+ # version
+ find_package (Git)
+ add_custom_target (version
+-        ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
++        ${CMAKE_COMMAND} -D VSAG_VERSION=v0.18.16 -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+         -D DST=${CMAKE_CURRENT_SOURCE_DIR}/src/version.h
+         -D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+ )
+ add_dependencies (vsag version)
++add_dependencies (vsag_static version)
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -17,4 +17,4 @@
+-if (GIT_EXECUTABLE)
++if (GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component (SRC_DIR ${SRC} DIRECTORY)
+   # Generate a git-describe version string from Git repository tags
+   execute_process (
+diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
+index b0571140..1fc3415f 100644
+--- a/extern/antlr4/antlr4.cmake
++++ b/extern/antlr4/antlr4.cmake
+@@ -11,6 +11,10 @@ else ()
+ endif ()
+ 
+ set (FULL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VSAG_ANTLR4_CXX11_ABI}")
++if (MSVC)
++    # ANTLR4 4.13.2 uses std::chrono without including its header on MSVC.
++    set (FULL_CXX_FLAGS "${FULL_CXX_FLAGS} /FIchrono")
++endif ()
+ 
+ set(antlr4_urls
+     https://github.com/antlr/antlr4/archive/refs/tags/4.13.2.tar.gz
+@@ -30,7 +34,7 @@ ExternalProject_Add(
+         BINARY_DIR ${binary_dir}
+         BUILD_IN_SOURCE 0
+         CONFIGURE_COMMAND
+-        cmake ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_STATIC_CRT=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
+         BUILD_COMMAND
+         cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
+         INSTALL_COMMAND cmake --install build
+@@ -50,7 +54,7 @@ include_directories(extern/antlr4/fc)
+ file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
+ add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
+ add_dependencies(antlr4-autogen antlr4)
+-target_compile_options(antlr4-autogen PRIVATE ${common_cmake_args} ${VSAG_ANTLR4_CXX11_ABI})
++target_compile_options(antlr4-autogen PRIVATE ${VSAG_ANTLR4_CXX11_ABI})
+ set_property(TARGET antlr4-autogen PROPERTY CXX_STANDARD 17)
+ target_link_libraries(antlr4-autogen antlr4-runtime)
+ 
+diff --git a/extern/boost/boost.cmake b/extern/boost/boost.cmake
+index f064f7d4..d4f975c6 100644
+--- a/extern/boost/boost.cmake
++++ b/extern/boost/boost.cmake
+@@ -1,12 +1,8 @@
+-# Copyright (c) 2022 Ant Group. All rights reserved.
+-
+-cmake_policy(SET CMP0114 NEW)
+-
++# DiskANN only uses header-only boost::dynamic_bitset, so installing Boost's
++# headers avoids compiling unrelated Boost libraries for each target.
+ set(name boost)
+ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
+ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+-get_filename_component(compiler_path ${CMAKE_CXX_COMPILER} DIRECTORY)
+-
+ set(boost_urls
+     https://archives.boost.io/release/1.67.0/source/boost_1_67_0.tar.gz
+ )
+@@ -23,52 +19,9 @@ ExternalProject_Add(
+     DOWNLOAD_DIR ${DOWNLOAD_DIR}
+     SOURCE_DIR ${source_dir}
+     CONFIGURE_COMMAND ""
+-    CONFIGURE_COMMAND
+-	env PATH=/usr/lib/ccache:$ENV{PATH}
+-        ./bootstrap.sh
+-            --without-icu
+-            --without-libraries=python,test,stacktrace,mpi,log,graph,graph_parallel
+-            --prefix=${install_dir}
+-    BUILD_COMMAND
+-	env PATH=/usr/lib/ccache:$ENV{PATH}
+-        ./b2 install
+-            -d0
+-            -j${NUM_BUILDING_JOBS}
+-            --prefix=${install_dir}
+-            --disable-icu
+-            include=${install_dir}/include
+-            linkflags=-L${install_dir}/lib
+-            "cxxflags=-fPIC ${extra_cpp_flags}"
+-            runtime-link=static
+-            link=static
+-            variant=release
+-    BUILD_IN_SOURCE 1
+-    INSTALL_COMMAND ""
+-    LOG_CONFIGURE TRUE
+-    LOG_BUILD TRUE
+-    LOG_INSTALL TRUE
+-    DOWNLOAD_NO_PROGRESS 0
++    BUILD_COMMAND ""
++    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${source_dir}/boost ${install_dir}/include/boost
++    DOWNLOAD_NO_PROGRESS 1
+     INACTIVITY_TIMEOUT 5
+-    # filesize ~= 90MiB
+     TIMEOUT 90
+ )
+-
+-ExternalProject_Add_Step(${name} setup-compiler
+-    DEPENDEES configure
+-    DEPENDERS build
+-    COMMAND
+-        echo "using gcc : : ${CMAKE_CXX_COMPILER} $<SEMICOLON>"
+-            > ${source_dir}/tools/build/src/user-config.jam
+-    WORKING_DIRECTORY ${source_dir}
+-)
+-
+-ExternalProject_Add_Step(${name} clean
+-    EXCLUDE_FROM_MAIN TRUE
+-    ALWAYS TRUE
+-    DEPENDEES configure
+-    COMMAND ./b2 clean
+-    COMMAND rm -f ${BUILD_INFO_DIR}/${name}-build
+-    WORKING_DIRECTORY ${source_dir}
+-)
+-
+-ExternalProject_Add_StepTargets(${name} clean)
+diff --git a/extern/diskann/DiskANN/include/cosine_similarity.h b/extern/diskann/DiskANN/include/cosine_similarity.h
+index 918a992e..7ec9e6b6 100644
+--- a/extern/diskann/DiskANN/include/cosine_similarity.h
++++ b/extern/diskann/DiskANN/include/cosine_similarity.h
+@@ -23,7 +23,7 @@
+ 
+ extern bool Avx2SupportedCPU;
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ // SIMD implementation of Cosine similarity. Taken from hnsw library.
+ 
+ /**
+diff --git a/extern/diskann/DiskANN/include/diskann_logger.h b/extern/diskann/DiskANN/include/diskann_logger.h
+index 0b17807d..3ee06dd3 100644
+--- a/extern/diskann/DiskANN/include/diskann_logger.h
++++ b/extern/diskann/DiskANN/include/diskann_logger.h
+@@ -22,7 +22,7 @@ using std::cerr;
+ using std::cout;
+ #endif
+ 
+-enum class DISKANN_DLLEXPORT LogLevel
++enum class LogLevel
+ {
+     LL_Info = 0,
+     LL_Error,
+diff --git a/extern/diskann/DiskANN/include/local_file_reader.h b/extern/diskann/DiskANN/include/local_file_reader.h
+index e0f77942..c85afd2e 100644
+--- a/extern/diskann/DiskANN/include/local_file_reader.h
++++ b/extern/diskann/DiskANN/include/local_file_reader.h
+@@ -1,9 +1,6 @@
+ 
+ #pragma once
+ 
+-#ifndef _WINDOWS
+-
+-#include <malloc.h>
+ #include <cstdio>
+ #include <mutex>
+ #include <thread>
+@@ -49,7 +46,3 @@ public:
+     // NOTE :: blocking call
+     void read(std::vector<AlignedRead> &read_reqs, bool async = false, CallBack callBack = nullptr);
+ };
+-
+-
+-
+-#endif
+diff --git a/extern/diskann/DiskANN/include/locking.h b/extern/diskann/DiskANN/include/locking.h
+index 2a70f4ff..9ad81795 100644
+--- a/extern/diskann/DiskANN/include/locking.h
++++ b/extern/diskann/DiskANN/include/locking.h
+@@ -3,13 +3,13 @@
+ 
+ #include <mutex>
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ #include "windows_slim_lock.h"
+ #endif
+ 
+ namespace diskann
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && __has_include("windows_slim_lock.h")
+ using non_recursive_mutex = windows_exclusive_slim_lock;
+ using LockGuard = windows_exclusive_slim_lock_guard;
+ #else
+diff --git a/extern/diskann/DiskANN/include/utils.h b/extern/diskann/DiskANN/include/utils.h
+index 22fa9f69..d4f8d51d 100644
+--- a/extern/diskann/DiskANN/include/utils.h
++++ b/extern/diskann/DiskANN/include/utils.h
+@@ -4,6 +4,7 @@
+ #pragma once
+ 
+ #include <errno.h>
++#include <stdlib.h>
+ 
+ #if defined(__i386__) || defined(__x86_64__)
+ #include <xmmintrin.h>
+@@ -113,6 +114,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
+ #endif
+@@ -240,7 +243,12 @@ inline void alloc_aligned(void **ptr, size_t size, size_t align)
+     if (IS_ALIGNED(size, align) == 0)
+         report_misalignment_of_requested_size(align);
+ #ifndef _WINDOWS
++#ifdef __ANDROID__
++    if (::posix_memalign(ptr, align, size) != 0)
++        *ptr = nullptr;
++#else
+     *ptr = ::aligned_alloc(align, size);
++#endif
+ #else
+     *ptr = ::_aligned_malloc(size, align); // note the swapped arguments!
+ #endif
+@@ -710,6 +718,8 @@ inline void open_file_to_write(std::ofstream &writer, const std::string &filenam
+         char buff[1024];
+ #ifdef _WINDOWS
+         auto ret = std::to_string(strerror_s(buff, 1024, errno));
++#elif defined(__APPLE__)
++        auto ret = std::to_string(strerror_r(errno, buff, 1024));
+ #else
+         auto ret = std::string(strerror_r(errno, buff, 1024));
+ #endif
+diff --git a/extern/diskann/DiskANN/include/windows_customizations.h b/extern/diskann/DiskANN/include/windows_customizations.h
+index e6c58466..dd4b0233 100644
+--- a/extern/diskann/DiskANN/include/windows_customizations.h
++++ b/extern/diskann/DiskANN/include/windows_customizations.h
+@@ -7,8 +7,10 @@
+ 
+ #ifdef _WINDLL
+ #define DISKANN_DLLEXPORT __declspec(dllexport)
+-#else
++#elif defined(DISKANN_USE_DLL)
+ #define DISKANN_DLLEXPORT __declspec(dllimport)
++#else
++#define DISKANN_DLLEXPORT
+ #endif
+ 
+ #else
+diff --git a/extern/diskann/DiskANN/src/disk_utils.cpp b/extern/diskann/DiskANN/src/disk_utils.cpp
+index c86c1baf..24f62bd4 100644
+--- a/extern/diskann/DiskANN/src/disk_utils.cpp
++++ b/extern/diskann/DiskANN/src/disk_utils.cpp
+@@ -25,7 +25,7 @@
+ void add_new_file_to_single_index(std::string index_file, std::string new_file)
+ {
+     std::unique_ptr<uint64_t[]> metadata;
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     diskann::load_bin<uint64_t>(index_file, metadata, nr, nc);
+     if (nc != 1)
+     {
+@@ -160,11 +160,13 @@
+                uint64_t warmup_dim, uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (files.fileExists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(files, cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         diskann::cout << "In the warmup file: " << cache_warmup_file << " File dim: " << file_dim
+                       << " File aligned dim: " << file_aligned_dim << " Expected dim: " << warmup_dim
+                       << " Expected aligned dim: " << warmup_aligned_dim << std::endl;
+@@ -192,11 +194,13 @@
+                uint64_t warmup_aligned_dim)
+ {
+     T *warmup = nullptr;
+-    uint64_t file_dim, file_aligned_dim;
++    size_t file_dim, file_aligned_dim;
+ 
+     if (file_exists(cache_warmup_file))
+     {
+-        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, warmup_num, file_dim, file_aligned_dim);
++        size_t loaded_warmup_num;
++        diskann::load_aligned_bin<T>(cache_warmup_file, warmup, loaded_warmup_num, file_dim, file_aligned_dim);
++        warmup_num = loaded_warmup_num;
+         if (file_dim != warmup_dim || file_aligned_dim != warmup_aligned_dim)
+         {
+             std::stringstream stream;
+@@ -419,7 +423,7 @@
+         {
+             // Gopal. random_shuffle() is deprecated.
+             std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-            nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++            nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+             // write into merged ofstream
+             merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+             merged_vamana_writer.write((char *)final_nhood.data(), nnbrs * sizeof(uint32_t));
+@@ -458,7 +462,7 @@
+ 
+     // Gopal. random_shuffle() is deprecated.
+     std::shuffle(final_nhood.begin(), final_nhood.end(), urng);
+-    nnbrs = (uint32_t)std::min(final_nhood.size(), (uint64_t)max_degree);
++    nnbrs = (uint32_t)std::min(final_nhood.size(), (size_t)max_degree);
+     // write into merged ofstream
+     merged_vamana_writer.write((char *)&nnbrs, sizeof(uint32_t));
+     if (nnbrs > 0)
+@@ -495,7 +499,7 @@
+     std::string token, line;
+     std::ifstream labels_stream(labels_file);
+     T *data;
+-    uint64_t npts, ndims;
++    size_t npts, ndims;
+     diskann::load_bin<T>(data_file, data, npts, ndims);
+ 
+     std::unordered_map<uint32_t, uint32_t> dummy_pt_ids;
+@@ -580,7 +584,7 @@
+     diskann::cout << "Extracting labels for shard" << std::endl;
+ 
+     uint32_t *ids = nullptr;
+-    uint64_t num_ids, tmp_dim;
++    size_t num_ids, tmp_dim;
+     diskann::load_bin(shard_ids_bin, ids, num_ids, tmp_dim);
+ 
+     uint32_t counter = 0, shard_counter = 0;
+@@ -694,7 +698,7 @@
+         diskann::IndexWriteParameters paras =
+             diskann::IndexWriteParametersBuilder(L, (2 * R / 3)).with_filter_list_size(Lf).build();
+ 
+-        uint64_t shard_base_dim, shard_base_pts;
++        size_t shard_base_dim, shard_base_pts;
+         get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
+         diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts, false, false, false, build_pq_bytes > 0,
+                                  build_pq_bytes, use_opq);
+diff --git a/extern/diskann/DiskANN/src/distance.cpp b/extern/diskann/DiskANN/src/distance.cpp
+index 707bb054..a6c63969 100644
+--- a/extern/diskann/DiskANN/src/distance.cpp
++++ b/extern/diskann/DiskANN/src/distance.cpp
+@@ -84,7 +84,7 @@ template <typename T> size_t Distance<T>::get_required_alignment() const
+ 
+ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<int8_t>(a, b, length);
+ #else
+     int magA = 0, magB = 0, scalarProduct = 0;
+@@ -101,7 +101,7 @@ float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b, uint32_t len
+ 
+ float DistanceCosineFloat::compare(const float *a, const float *b, uint32_t length) const
+ {
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+     return diskann::CosineSimilarity2<float>(a, b, length);
+ #else
+     float magA = 0, magB = 0, scalarProduct = 0;
+@@ -247,7 +247,7 @@ template <typename T> float SlowDistanceL2<T>::compare(const T *a, const T *b, u
+     return result;
+ }
+ 
+-#ifdef _WINDOWS
++#if defined(_WINDOWS) && !defined(__clang__)
+ float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
+ {
+     __m128 r = _mm_setzero_ps();
+@@ -304,6 +304,27 @@ float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t lengt
+ 
+     return sum.m128_f32[0] + sum.m128_f32[1] + sum.m128_f32[2] + sum.m128_f32[3];
+ }
++#elif defined(_WINDOWS)
++float AVXDistanceL2Int8::compare(const int8_t *a, const int8_t *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = static_cast<float>(a[i]) - static_cast<float>(b[i]);
++        result += difference * difference;
++    }
++    return result;
++}
++float AVXDistanceL2Float::compare(const float *a, const float *b, uint32_t length) const
++{
++    float result = 0;
++    for (uint32_t i = 0; i < length; ++i)
++    {
++        const float difference = a[i] - b[i];
++        result += difference * difference;
++    }
++    return result;
++}
+ #else
+ float AVXDistanceL2Int8::compare(const int8_t *, const int8_t *, uint32_t) const
+ {
+diff --git a/extern/diskann/DiskANN/src/math_utils.cpp b/extern/diskann/DiskANN/src/math_utils.cpp
+index 9244715e..ee603359 100644
+--- a/extern/diskann/DiskANN/src/math_utils.cpp
++++ b/extern/diskann/DiskANN/src/math_utils.cpp
+@@ -2,7 +2,6 @@
+ // Licensed under the MIT license.
+ 
+ #include <limits>
+-#include <malloc.h>
+ #include <math_utils.h>
+ // #include <mkl.h>
+ #include <cblas.h>
+diff --git a/extern/diskann/DiskANN/src/partition.cpp b/extern/diskann/DiskANN/src/partition.cpp
+index 155db16b..60996ef2 100644
+--- a/extern/diskann/DiskANN/src/partition.cpp
++++ b/extern/diskann/DiskANN/src/partition.cpp
+@@ -474,3 +474,3 @@
+     uint32_t *shard_ids;
+-    uint64_t shard_size, tmp;
++    size_t shard_size, tmp;
+     diskann::load_bin<uint32_t>(idmap_filename, shard_ids, shard_size, tmp);
+diff --git a/extern/diskann/DiskANN/src/pq.cpp b/extern/diskann/DiskANN/src/pq.cpp
+index 920abad3..35c29ecf 100644
+--- a/extern/diskann/DiskANN/src/pq.cpp
++++ b/extern/diskann/DiskANN/src/pq.cpp
+@@ -49,7 +49,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ {
+ #endif
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+     std::string rotmat_file = std::string(pq_table_file) + "_rotation_matrix.bin";
+ 
+ #ifdef EXEC_ENV_OLS
+@@ -171,7 +171,7 @@ void FixedChunkPQTable::load_pq_centroid_bin(const char *pq_table_file, size_t n
+ void FixedChunkPQTable::load_pq_centroid_bin(std::stringstream &pq_table, size_t num_chunks)
+ {
+ 
+-    uint64_t nr, nc;
++    size_t nr, nc;
+ 
+     std::unique_ptr<size_t[]> file_offset_data;
+     diskann::load_bin<size_t>(pq_table, reinterpret_cast<size_t *&>(file_offset_data), nr, nc);
+diff --git a/extern/diskann/DiskANN/src/pq_flash_index.cpp b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+index 0feeb2fe..77b5a7ac 100644
+--- a/extern/diskann/DiskANN/src/pq_flash_index.cpp
++++ b/extern/diskann/DiskANN/src/pq_flash_index.cpp
+@@ -12,7 +12,3 @@
+ 
+-#ifdef _WINDOWS
+-#include "windows_aligned_file_reader.h"
+-#else
+ #include "local_file_reader.h"
+-#endif
+ 
+@@ -214,3 +210,3 @@
+ 
+-    uint64_t sample_num, sample_dim, sample_aligned_dim;
++    size_t sample_num, sample_dim, sample_aligned_dim;
+     T *samples;
+@@ -254,3 +250,3 @@
+     node_list.shrink_to_fit();
+-    num_nodes_to_cache = std::min(num_nodes_to_cache, this->node_visit_counter.size());
++    num_nodes_to_cache = std::min<uint64_t>(num_nodes_to_cache, this->node_visit_counter.size());
+     node_list.reserve(num_nodes_to_cache);
+@@ -342,3 +338,3 @@
+-        uint64_t BLOCK_SIZE = 1024;
+-        uint64_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
++        size_t BLOCK_SIZE = 1024;
++        size_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
+         for (size_t block = 0; block < nblocks && !finish_flag; block++)
+@@ -1011,3 +1007,3 @@
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+@@ -1040,3 +1036,3 @@
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+@@ -1291,3 +1287,3 @@
+     {
+-        uint64_t dumr, dumc;
++        size_t dumr, dumc;
+         float *norm_val;
+@@ -1311,3 +1307,3 @@
+ 
+-    uint64_t nrow, ncol;
++    size_t nrow, ncol;
+     std::unique_ptr<size_t[]> file_offset_data;
+diff --git a/extern/diskann/diskann.cmake b/extern/diskann/diskann.cmake
+index c1ed55f8..25bd4c85 100644
+--- a/extern/diskann/diskann.cmake
++++ b/extern/diskann/diskann.cmake
+@@ -35,7 +35,12 @@ set(DISKANN_SOURCES
+ #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
+ 
+ add_library(diskann STATIC ${DISKANN_SOURCES})
+-target_compile_options(diskann PRIVATE -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DENABLE_CUSTOM_LOGGER=1)
++if (MSVC)
++  target_compile_options(diskann PRIVATE /openmp /DENABLE_CUSTOM_LOGGER=1)
++  target_compile_definitions(diskann PRIVATE _WINDOWS NOMINMAX)
++else ()
++  target_compile_options(diskann PRIVATE -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DENABLE_CUSTOM_LOGGER=1)
++endif ()
+ set_property(TARGET diskann PROPERTY CXX_STANDARD 17)
+ add_dependencies(diskann boost openblas)
+ 
+diff --git a/extern/mkl/mkl.cmake b/extern/mkl/mkl.cmake
+index 0a81bbea..53d3dae4 100644
+--- a/extern/mkl/mkl.cmake
++++ b/extern/mkl/mkl.cmake
+@@ -135,12 +135,18 @@ else()
+         message(WARNING "Intel MKL is not supported on this architecture (${CMAKE_HOST_SYSTEM_PROCESSOR}). Falling back to OpenBLAS.")
+     endif()
+ 
+-    set(BLAS_LIBRARIES libopenblas.a)
+-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+-        list(PREPEND BLAS_LIBRARIES omp)
+-    else()
+-        list(PREPEND BLAS_LIBRARIES gomp)
+-    endif()
++    if (WIN32)
++        set(BLAS_LIBRARIES ${CMAKE_BINARY_DIR}/openblas/install/lib/openblas.lib)
++    elseif (APPLE OR ANDROID)
++        set(BLAS_LIBRARIES ${CMAKE_BINARY_DIR}/openblas/install/lib/libopenblas.a)
++    else ()
++        set(BLAS_LIBRARIES libopenblas.a)
++        if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++            list(PREPEND BLAS_LIBRARIES omp)
++        else()
++            list(PREPEND BLAS_LIBRARIES gomp)
++        endif()
++    endif ()
+     message ("enable openblas as blas backend")
+ endif()
+ 
+diff --git a/extern/openblas/openblas.cmake b/extern/openblas/openblas.cmake
+index 23b43395..3a74d477 100644
+--- a/extern/openblas/openblas.cmake
++++ b/extern/openblas/openblas.cmake
+@@ -1,9 +1,9 @@
+-
+ set(name openblas)
+ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
+ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+ 
+ set(openblas_urls
++    https://codeload.github.com/OpenMathLib/OpenBLAS/tar.gz/refs/tags/v0.3.34
+     https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz
+     https://sourceforge.net/projects/openblas/files/v0.3.34/OpenBLAS-0.3.34.tar.gz/download
+ )
+@@ -24,7 +24,60 @@ foreach(entry IN LISTS common_configure_envs)
+     list(APPEND openblas_configure_envs "${entry}")
+ endforeach()
+ 
+-ExternalProject_Add(
++if (WIN32 OR APPLE OR ANDROID)
++    # The upstream Make recipe assumes a GNU host toolchain. Its CMake build
++    # supports MSVC and propagates the Android and macOS target settings.
++    set(openblas_target ARMV8)
++    if (WIN32)
++        set(openblas_target CORE2)
++    endif ()
++    set(openblas_c_flags "${CMAKE_C_FLAGS}")
++    if (APPLE OR ANDROID)
++        # The bundled C LAPACK translation has legacy pointer-type warnings.
++        string(APPEND openblas_c_flags " -Wno-error=incompatible-pointer-types")
++    endif ()
++    ExternalProject_Add(
++        ${name}
++        URL ${openblas_urls}
++        URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
++        DOWNLOAD_NAME OpenBLAS-v0.3.34.tar.gz
++        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
++        SOURCE_DIR ${source_dir}
++        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${name}/build
++        CMAKE_ARGS ${common_cmake_args}
++            "-DCMAKE_C_FLAGS=${openblas_c_flags}"
++            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
++            -DCMAKE_INSTALL_PREFIX=${install_dir}
++            -DCMAKE_INSTALL_LIBDIR=lib
++            -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
++            -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
++            -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
++            -DBUILD_WITHOUT_LAPACK=OFF
++            -DC_LAPACK=ON
++            -DNO_LAPACKE=OFF
++            -DBUILD_TESTING=OFF
++            -DBUILD_STATIC_LIBS=ON
++            -DBUILD_SHARED_LIBS=OFF
++            -DNOFORTRAN=ON
++            -DUSE_THREAD=OFF
++            -DUSE_LOCKING=ON
++            -DDYNAMIC_ARCH=OFF
++            -DTARGET=${openblas_target}
++        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target openblas_static --parallel ${NUM_BUILDING_JOBS}
++        INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> --prefix ${install_dir}
++        LOG_CONFIGURE TRUE
++        LOG_BUILD TRUE
++        LOG_INSTALL TRUE
++        LOG_OUTPUT_ON_FAILURE TRUE
++        DOWNLOAD_NO_PROGRESS 1
++        INACTIVITY_TIMEOUT 5
++        TIMEOUT 90
++    )
++else ()
++    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
++        set(openblas_make_target TARGET=CORE2)
++    endif ()
++    ExternalProject_Add(
+     ${name}
+     URL ${openblas_urls}
+     URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
+@@ -40,10 +93,10 @@ ExternalProject_Add(
+         OMP_NUM_THREADS=1
+         PATH=/usr/lib/ccache:$ENV{PATH}
+         LD_LIBRARY_PATH=/opt/alibaba-cloud-compiler/lib64/:$ENV{LD_LIBRARY_PATH}
+-        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 NOFORTRAN=1
++        make USE_THREAD=0 USE_LOCKING=1 DYNAMIC_ARCH=1 NOFORTRAN=1 ${openblas_make_target}
+              MAKE_NB_JOBS=${NUM_BUILDING_JOBS} -j${NUM_BUILDING_JOBS}
+     INSTALL_COMMAND
+-        make DYNAMIC_ARCH=1 NOFORTRAN=1 PREFIX=${install_dir} install
++        make DYNAMIC_ARCH=1 NOFORTRAN=1 ${openblas_make_target} PREFIX=${install_dir} install
+     BUILD_BYPRODUCTS ${install_dir}/lib/libopenblas.a
+     BUILD_IN_SOURCE 1
+     LOG_CONFIGURE TRUE
+@@ -53,28 +106,12 @@ ExternalProject_Add(
+     DOWNLOAD_NO_PROGRESS 1
+     INACTIVITY_TIMEOUT 5
+     TIMEOUT 30
+-)
+-
+-include_directories(${install_dir}/include)
+-link_directories (${install_dir}/lib)
+-link_directories (${install_dir}/lib64)
+-
+-file(GLOB LIB_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib)
+-if(LIB_DIR_EXIST)
+-    file(GLOB LIB_FILES ${install_dir}/lib/lib*.a)
+-    foreach(lib_file ${LIB_FILES})
+-        install(FILES ${lib_file}
+-                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+     )
+-    endforeach()
+-endif()
++endif ()
+ 
+-file(GLOB LIB64_DIR_EXIST CHECK_DIRECTORIES LIST_DIRECTORIES true ${install_dir}/lib64)
+-if(LIB64_DIR_EXIST)
+-    file(GLOB LIB64_FILES ${install_dir}/lib64/lib*.a)
+-    foreach(lib64_file ${LIB64_FILES})
+-        install(FILES ${lib64_file}
+-                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+-    )
+-    endforeach()
+-endif()
++include_directories(${install_dir}/include)
++if (WIN32 OR APPLE OR ANDROID)
++    # OpenBLAS CMake installs cblas.h under include/openblas.
++    include_directories(${install_dir}/include/openblas)
++endif ()
++link_directories(${install_dir}/lib)
+diff --git a/extern/roaringbitmap/roaringbitmap.cmake b/extern/roaringbitmap/roaringbitmap.cmake
+index 4b87cf05..21da6409 100644
+--- a/extern/roaringbitmap/roaringbitmap.cmake
++++ b/extern/roaringbitmap/roaringbitmap.cmake
+@@ -29,5 +29,7 @@ FetchContent_GetProperties(roaringbitmap)
+ if(NOT roaringbitmap_POPULATED)
+   FetchContent_Populate(roaringbitmap)
+   add_subdirectory(${roaringbitmap_SOURCE_DIR} ${roaringbitmap_BINARY_DIR} EXCLUDE_FROM_ALL)
+-  target_compile_options(roaring PRIVATE -Wno-unused-function)
++  if (NOT MSVC)
++    target_compile_options(roaring PRIVATE -Wno-unused-function)
++  endif ()
+ endif()
+diff --git a/extern/spdlog/spdlog.cmake b/extern/spdlog/spdlog.cmake
+index 8e5dce8d..b4174a65 100644
+--- a/extern/spdlog/spdlog.cmake
++++ b/extern/spdlog/spdlog.cmake
+@@ -4,16 +4,16 @@ set(source_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/source)
+ set(install_dir ${CMAKE_CURRENT_BINARY_DIR}/${name}/install)
+ ExternalProject_Add(
+     ${name}
+-    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.12.0.tar.gz
+-    URL_HASH MD5=6b4446526264c1d1276105482adc18d1
+-    DOWNLOAD_NAME spdlog-1.12.0.tar.gz
++    URL https://codeload.github.com/gabime/spdlog/tar.gz/refs/tags/v1.14.1
++    URL_HASH SHA256=1586508029a7d0670dfcb2d97575dcdc242d3868a259742b69f100801ab4e16b
++    DOWNLOAD_NAME spdlog-1.14.1.tar.gz
+     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/${name}
+     TMP_DIR ${BUILD_INFO_DIR}
+     STAMP_DIR ${BUILD_INFO_DIR}
+     DOWNLOAD_DIR ${DOWNLOAD_DIR}
+     SOURCE_DIR ${source_dir}
+     CONFIGURE_COMMAND
+-    	cmake -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_INSTALL_PREFIX=${install_dir} -S. -Bbuild
+     BUILD_COMMAND
+ 	cmake --build build --target install --parallel 4
+     INSTALL_COMMAND
+diff --git a/include/vsag/allocator.h b/include/vsag/allocator.h
+index d21476be..cf7e2696 100644
+--- a/include/vsag/allocator.h
++++ b/include/vsag/allocator.h
+@@ -14,10 +14,19 @@
+ 
+ #pragma once
+ 
++#include <cstddef>
++#include <cstdint>
+ #include <string>
+ 
+ namespace vsag {
+ 
++// seekdb overrides these methods with uint64_t on macOS.
++#if defined(__APPLE__)
++using AllocatorSize = uint64_t;
++#else
++using AllocatorSize = size_t;
++#endif
++
+ /**
+  * @class Allocator
+  * @brief An abstract base class for custom memory management.
+@@ -49,7 +58,7 @@ public:
+      * @return void* Pointer to the allocated memory block.
+      */
+     virtual void*
+-    Allocate(size_t size) = 0;
++    Allocate(AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Deallocates a previously allocated block of memory.
+@@ -73,7 +82,7 @@ public:
+      * @return void* Pointer to the reallocated memory block.
+      */
+     virtual void*
+-    Reallocate(void* p, size_t size) = 0;
++    Reallocate(void* p, AllocatorSize size) = 0;
+ 
+     /**
+      * @brief Constructs a new object of type T.
+diff --git a/src/algorithm/hgraph.cpp b/src/algorithm/hgraph.cpp
+index 132baba8..ec7f0bb5 100644
+--- a/src/algorithm/hgraph.cpp
++++ b/src/algorithm/hgraph.cpp
+@@ -1957,12 +1957,12 @@ HGraph::CheckAndMappingExternalParam(const JsonType& external_param,
+     hgraph_parameter->FromJson(inner_json);
+     uint64_t max_degree = hgraph_parameter->bottom_graph_param->max_degree_;
+ 
+-    auto max_degree_threshold = std::max(common_param.dim_, 128L);
++    auto max_degree_threshold = std::max(common_param.dim_, int64_t{128});
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= max_degree) and (max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", max_degree, max_degree_threshold));
+ 
+-    auto construction_threshold = std::max(1000UL, AMPLIFICATION_FACTOR * max_degree);
++    auto construction_threshold = std::max(uint64_t{1000}, AMPLIFICATION_FACTOR * max_degree);
+     CHECK_ARGUMENT((max_degree <= hgraph_parameter->ef_construction) and  // NOLINT
+                        (hgraph_parameter->ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
+diff --git a/src/algorithm/hgraph.h b/src/algorithm/hgraph.h
+index 6075579a..d4e797fc 100644
+--- a/src/algorithm/hgraph.h
++++ b/src/algorithm/hgraph.h
+@@ -16,6 +16,7 @@
+ #pragma once
+ 
+ #include <istream>
++#include <numeric>
+ #include <random>
+ #include <shared_mutex>
+ #include <string>
+diff --git a/src/algorithm/hnswlib/hnswalg.cpp b/src/algorithm/hnswlib/hnswalg.cpp
+index 5950e592..38b062d9 100644
+--- a/src/algorithm/hnswlib/hnswalg.cpp
++++ b/src/algorithm/hnswlib/hnswalg.cpp
+@@ -1683,7 +1683,7 @@ HierarchicalNSW::addPoint(const void* data_point, LabelType label, int level) {
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchKnn(const void* query_data,
+                            size_t k,
+-                           uint64_t ef,
++                           size_t ef,
+                            const vsag::FilterPtr is_id_allowed,
+                            const float skip_ratio,
+                            vsag::FilterSearchSkipStrategyType skip_strategy_type,
+@@ -1808,7 +1808,7 @@ HierarchicalNSW::searchKnn(const void* query_data,
+ std::priority_queue<std::pair<float, LabelType>>
+ HierarchicalNSW::searchRange(const void* query_data,
+                              float radius,
+-                             uint64_t ef,
++                             size_t ef,
+                              const vsag::FilterPtr is_id_allowed) const {
+     std::shared_lock resize_lock(resize_mutex_);
+     std::priority_queue<std::pair<float, LabelType>> result;
+diff --git a/src/algorithm/hnswlib/hnswalg.h b/src/algorithm/hnswlib/hnswalg.h
+index 1d891e08..64d61aaa 100644
+--- a/src/algorithm/hnswlib/hnswalg.h
++++ b/src/algorithm/hnswlib/hnswalg.h
+@@ -465,7 +465,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::FilterSearchSkipStrategyType skip_strategy_type =
+@@ -478,7 +478,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override;
+ 
+     void
+diff --git a/src/algorithm/hnswlib/hnswalg_static.h b/src/algorithm/hnswlib/hnswalg_static.h
+index 1889fb27..255936ea 100644
+--- a/src/algorithm/hnswlib/hnswalg_static.h
++++ b/src/algorithm/hnswlib/hnswalg_static.h
+@@ -1406,7 +1406,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchKnn(const void* query_data,
+               size_t k,
+-              uint64_t ef,
++              size_t ef,
+               const vsag::FilterPtr is_id_allowed = nullptr,
+               const float skip_ratio = 0.9f,
+               vsag::FilterSearchSkipStrategyType skip_strategy_type =
+@@ -1489,7 +1489,7 @@ public:
+     std::priority_queue<std::pair<float, LabelType>>
+     searchRange(const void* query_data,
+                 float radius,
+-                uint64_t ef,
++                size_t ef,
+                 const vsag::FilterPtr is_id_allowed = nullptr) const override {
+         std::runtime_error("static hnsw does not support range search");
+         //        std::priority_queue<std::pair<float, LabelType>> result;
+diff --git a/src/algorithm/ivf_partition/gno_imi_partition.cpp b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+index 76ede916..d29c16fc 100644
+--- a/src/algorithm/ivf_partition/gno_imi_partition.cpp
++++ b/src/algorithm/ivf_partition/gno_imi_partition.cpp
+@@ -349,7 +349,7 @@ GNOIMIPartition::inner_classify_datas(BruteForce& route_index, const float* data
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max(int64_t{10}, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result = route_index.KnnSearch(query, buckets_per_data, search_param, filter);
+         const auto* result_ids = search_result->GetIds();
+diff --git a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+index 97c72238..7d3d5b50 100644
+--- a/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
++++ b/src/algorithm/ivf_partition/ivf_nearest_partition.cpp
+@@ -102,7 +102,7 @@ IVFNearestPartition::ClassifyDatas(const void* datas,
+             ->NumElements(1)
+             ->Owner(false);
+         auto search_param = fmt::format(
+-            SEARCH_PARAM_TEMPLATE_STR, std::max(10L, static_cast<int64_t>(buckets_per_data * 1.2)));
++            SEARCH_PARAM_TEMPLATE_STR, std::max(int64_t{10}, static_cast<int64_t>(buckets_per_data * 1.2)));
+         FilterPtr filter = nullptr;
+         auto search_result =
+             this->route_index_ptr_->KnnSearch(query, buckets_per_data, search_param, filter);
+diff --git a/src/algorithm/pyramid.cpp b/src/algorithm/pyramid.cpp
+index c8a28175..82de2bad 100644
+--- a/src/algorithm/pyramid.cpp
++++ b/src/algorithm/pyramid.cpp
+@@ -249,7 +249,7 @@ Pyramid::KnnSearch(const DatasetPtr& query,
+     QueryContext ctx{.stats = &stats};
+ 
+     auto parsed_param = PyramidSearchParameters::FromJson(parameters);
+-    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++    auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, int64_t{1000});
+     CHECK_ARGUMENT(  // NOLINT
+         (1 <= parsed_param.ef_search) and (parsed_param.ef_search <= ef_search_threshold),
+         fmt::format(
+diff --git a/src/algorithm/sindi/sindi.cpp b/src/algorithm/sindi/sindi.cpp
+index 140872e0..5c92b5bd 100644
+--- a/src/algorithm/sindi/sindi.cpp
++++ b/src/algorithm/sindi/sindi.cpp
+@@ -268,7 +268,7 @@ SINDI::search_impl(const SparseTermComputerPtr& computer,
+                 term_list->InsertHeapByTermLists<mode, WITH_FILTER>(
+                     dists.data(), computer, heap, inner_param, window_start_id);
+             } else {
+-                term_list->InsertHeapByTermLists<mode, PURE>(
++                term_list->InsertHeapByTermLists<mode, PURE_SEARCH>(
+                     dists.data(), computer, heap, inner_param, window_start_id);
+             }
+         } else {
+@@ -276,7 +276,7 @@ SINDI::search_impl(const SparseTermComputerPtr& computer,
+                 term_list->InsertHeapByDists<mode, WITH_FILTER>(
+                     dists.data(), dists.size(), heap, inner_param, window_start_id);
+             } else {
+-                term_list->InsertHeapByDists<mode, PURE>(
++                term_list->InsertHeapByDists<mode, PURE_SEARCH>(
+                     dists.data(), dists.size(), heap, inner_param, window_start_id);
+             }
+         }
+diff --git a/src/analyzer/hgraph_analyzer.cpp b/src/analyzer/hgraph_analyzer.cpp
+index 4669611e..c21ea9e0 100644
+--- a/src/analyzer/hgraph_analyzer.cpp
++++ b/src/analyzer/hgraph_analyzer.cpp
+@@ -131,3 +131,3 @@
+         const auto* gt_data = groundtruth->GetData();
+-        auto neighbor_count = std::min(neighbors.size(), groundtruth->Size());
++        auto neighbor_count = std::min<size_t>(neighbors.size(), groundtruth->Size());
+         for (uint32_t i = 0; i < neighbor_count; ++i) {
+diff --git a/src/datacell/sparse_term_datacell.cpp b/src/datacell/sparse_term_datacell.cpp
+index 872df25b..aca3ceda 100644
+--- a/src/datacell/sparse_term_datacell.cpp
++++ b/src/datacell/sparse_term_datacell.cpp
+@@ -482,7 +482,7 @@ SparseTermDataCell::Decode(const uint8_t* src, size_t size, float* dst) const {
+ }
+ 
+ template void
+-SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     const SparseTermComputerPtr& computer,
+     MaxHeap& heap,
+@@ -499,7 +499,7 @@ SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::KNN_SEARCH,
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     const SparseTermComputerPtr& computer,
+     MaxHeap& heap,
+@@ -516,7 +516,7 @@ SparseTermDataCell::InsertHeapByTermLists<InnerSearchMode::RANGE_SEARCH,
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     uint32_t dists_size,
+     MaxHeap& heap,
+@@ -532,7 +532,7 @@ SparseTermDataCell::InsertHeapByDists<InnerSearchMode::KNN_SEARCH, InnerSearchTy
+     uint32_t offset_id) const;
+ 
+ template void
+-SparseTermDataCell::InsertHeapByDists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE>(
++SparseTermDataCell::InsertHeapByDists<InnerSearchMode::RANGE_SEARCH, InnerSearchType::PURE_SEARCH>(
+     float* dists,
+     uint32_t dists_size,
+     MaxHeap& heap,
+diff --git a/src/datacell/sparse_term_datacell.h b/src/datacell/sparse_term_datacell.h
+index 77003593..0ce0a51f 100644
+--- a/src/datacell/sparse_term_datacell.h
++++ b/src/datacell/sparse_term_datacell.h
+@@ -59,7 +59,7 @@ public:
+      * @param offset_id Offset to add to inner IDs when inserting into heap
+      */
+     template <InnerSearchMode mode = InnerSearchMode::KNN_SEARCH,
+-              InnerSearchType type = InnerSearchType::PURE>
++              InnerSearchType type = InnerSearchType::PURE_SEARCH>
+     void
+     InsertHeapByTermLists(float* dists,
+                           const SparseTermComputerPtr& computer,
+@@ -77,7 +77,7 @@ public:
+      * @param offset_id Offset to add to inner IDs when inserting into heap
+      */
+     template <InnerSearchMode mode = InnerSearchMode::KNN_SEARCH,
+-              InnerSearchType type = InnerSearchType::PURE>
++              InnerSearchType type = InnerSearchType::PURE_SEARCH>
+     void
+     InsertHeapByDists(float* dists,
+                       uint32_t dists_size,
+diff --git a/src/datacell/sparse_term_datacell_test.cpp b/src/datacell/sparse_term_datacell_test.cpp
+index 6bfde463..f32de5ec 100644
+--- a/src/datacell/sparse_term_datacell_test.cpp
++++ b/src/datacell/sparse_term_datacell_test.cpp
+@@ -139,7 +139,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists(count_base, 0);
+         data_cell->Query(dists.data(), computer);
+ 
+-        data_cell->InsertHeapByTermLists<KNN_SEARCH, PURE>(
++        data_cell->InsertHeapByTermLists<KNN_SEARCH, PURE_SEARCH>(
+             dists.data(), computer, heap, inner_param, 0);
+         REQUIRE(heap.size() == topk);
+ 
+@@ -159,7 +159,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists2(count_base, 0);
+         data_cell->Query(dists2.data(), computer);
+         MaxHeap heap2(allocator.get());
+-        data_cell->InsertHeapByDists<KNN_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<KNN_SEARCH, PURE_SEARCH>(
+             dists2.data(), dists2.size(), heap2, inner_param, 0);
+ 
+         // Extract results from InsertHeapByDists
+@@ -188,7 +188,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         inner_param.radius = dists[pos];
+         MaxHeap heap(allocator.get());
+ 
+-        data_cell->InsertHeapByTermLists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByTermLists<RANGE_SEARCH, PURE_SEARCH>(
+             dists.data(), computer, heap, inner_param, 0);
+         REQUIRE(heap.size() == range_topk);
+ 
+@@ -207,7 +207,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         std::vector<float> dists2(count_base, 0);
+         data_cell->Query(dists2.data(), computer);
+         MaxHeap heap2(allocator.get());
+-        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE_SEARCH>(
+             dists2.data(), dists2.size(), heap2, inner_param, 0);
+ 
+         // Extract results from InsertHeapByDists
+@@ -236,7 +236,7 @@ TEST_CASE("SparseTermDatacell Basic Test", "[ut][SparseTermDatacell]") {
+         dists[7] = -0.5F;
+         MaxHeap heap(allocator.get());
+ 
+-        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE>(
++        data_cell->InsertHeapByDists<RANGE_SEARCH, PURE_SEARCH>(
+             dists.data(), dists.size(), heap, inner_param, 0);
+ 
+         REQUIRE(heap.size() == 2);
+diff --git a/src/impl/allocator/default_allocator.cpp b/src/impl/allocator/default_allocator.cpp
+index 09a119b5..0b6fe127 100644
+--- a/src/impl/allocator/default_allocator.cpp
++++ b/src/impl/allocator/default_allocator.cpp
+@@ -15,6 +15,7 @@
+ 
+ #include "default_allocator.h"
+ 
++#include <cstdlib>
+ #include <fmt/format.h>
+ 
+ #include "impl/logger/logger.h"
+@@ -26,7 +27,7 @@ DefaultAllocator::~DefaultAllocator() {
+         logger::error(fmt::format("There is a memory leak in {}, size: {}",
+                                   DefaultAllocator::Name(),
+                                   allocated_ptrs_.size()));
+-        abort();
++        std::abort();
+     }
+ }
+ #else
+@@ -34,8 +35,8 @@ DefaultAllocator::~DefaultAllocator() = default;
+ #endif
+ 
+ void*
+-DefaultAllocator::Allocate(size_t size) {
+-    auto* ptr = malloc(size);
++DefaultAllocator::Allocate(AllocatorSize size) {
++    auto* ptr = std::malloc(size);
+ #ifndef NDEBUG
+     std::lock_guard<std::mutex> guard(set_mutex_);
+     allocated_ptrs_.insert(ptr);
+@@ -56,11 +57,11 @@ DefaultAllocator::Deallocate(void* p) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    free(p);
++    std::free(p);
+ }
+ 
+ void*
+-DefaultAllocator::Reallocate(void* p, size_t size) {
++DefaultAllocator::Reallocate(void* p, AllocatorSize size) {
+ #ifndef NDEBUG
+     if (p == nullptr) {
+         return Allocate(size);
+@@ -72,7 +73,7 @@ DefaultAllocator::Reallocate(void* p, size_t size) {
+     }
+     allocated_ptrs_.erase(p);
+ #endif
+-    auto* ptr = realloc(p, size);
++    auto* ptr = std::realloc(p, size);
+ #ifndef NDEBUG
+     allocated_ptrs_.insert(ptr);
+ #endif
+diff --git a/src/impl/allocator/default_allocator.h b/src/impl/allocator/default_allocator.h
+index 4cffca62..8c7497ea 100644
+--- a/src/impl/allocator/default_allocator.h
++++ b/src/impl/allocator/default_allocator.h
+@@ -35,13 +35,13 @@ public:
+     Name() override;
+ 
+     void*
+-    Allocate(size_t size) override;
++    Allocate(AllocatorSize size) override;
+ 
+     void
+     Deallocate(void* p) override;
+ 
+     void*
+-    Reallocate(void* p, size_t size) override;
++    Reallocate(void* p, AllocatorSize size) override;
+ 
+ private:
+ #ifndef NDEBUG
+diff --git a/src/impl/allocator/safe_allocator.h b/src/impl/allocator/safe_allocator.h
+index 1977ed7b..6eef6856 100644
+--- a/src/impl/allocator/safe_allocator.h
++++ b/src/impl/allocator/safe_allocator.h
+@@ -47,7 +47,7 @@ public:
+     }
+ 
+     void*
+-    Allocate(size_t size) override {
++    Allocate(AllocatorSize size) override {
+         auto ret = raw_allocator_->Allocate(size);
+         if (not ret) {
+             throw std::bad_alloc();
+@@ -61,7 +61,7 @@ public:
+     }
+ 
+     void*
+-    Reallocate(void* p, size_t size) override {
++    Reallocate(void* p, AllocatorSize size) override {
+         auto ret = raw_allocator_->Reallocate(p, size);
+         if (not ret) {
+             throw std::bad_alloc();
+diff --git a/src/impl/cluster/kmeans_cluster.cpp b/src/impl/cluster/kmeans_cluster.cpp
+index 636a9a95..a32fd3b9 100644
+--- a/src/impl/cluster/kmeans_cluster.cpp
++++ b/src/impl/cluster/kmeans_cluster.cpp
+@@ -17,6 +17,7 @@
+ 
+ #include <omp.h>
+ 
++#include <numeric>
+ #include <random>
+ 
+ #include "algorithm/inner_index_interface.h"
+diff --git a/src/impl/heap/memmove_heap.cpp b/src/impl/heap/memmove_heap.cpp
+index 9b023fc0..f625d269 100644
+--- a/src/impl/heap/memmove_heap.cpp
++++ b/src/impl/heap/memmove_heap.cpp
+@@ -15,7 +15,7 @@
+ 
+ #include "memmove_heap.h"
+ 
+-#include <cstring>
++#include <algorithm>
+ namespace vsag {
+ template <bool max_heap, bool fixed_size>
+ MemmoveHeap<max_heap, fixed_size>::MemmoveHeap(Allocator* allocator, int64_t max_size)
+@@ -37,10 +37,9 @@ MemmoveHeap<max_heap, fixed_size>::Push(float dist, InnerIdType id) {
+                                         record,
+                                         CompareType()) -
+                        this->ordered_buffer_.begin();
+-            // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-            memmove(ordered_buffer_.data() + pos + 1,
+-                    ordered_buffer_.data() + pos,
+-                    (max_size_ - pos) * sizeof(DistanceRecord));
++            std::move_backward(ordered_buffer_.begin() + pos,
++                               ordered_buffer_.begin() + max_size_,
++                               ordered_buffer_.begin() + max_size_ + 1);
+             ordered_buffer_[pos] = record;
+             this->cur_size_++;
+             if (this->Size() > this->max_size_) {
+@@ -54,10 +53,9 @@ MemmoveHeap<max_heap, fixed_size>::Push(float dist, InnerIdType id) {
+                 this->ordered_buffer_.begin(), this->ordered_buffer_.end(), record, CompareType()) -
+             this->ordered_buffer_.begin();
+         ordered_buffer_.emplace_back(record);
+-        // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-        memmove(ordered_buffer_.data() + pos + 1,
+-                ordered_buffer_.data() + pos,
+-                (cur_size_ - pos) * sizeof(DistanceRecord));
++        std::move_backward(ordered_buffer_.begin() + pos,
++                           ordered_buffer_.begin() + cur_size_,
++                           ordered_buffer_.begin() + cur_size_ + 1);
+         ordered_buffer_[pos] = record;
+         cur_size_++;
+     }
+diff --git a/src/impl/inner_search_param.h b/src/impl/inner_search_param.h
+index 181e636e..86d9374c 100644
+--- a/src/impl/inner_search_param.h
++++ b/src/impl/inner_search_param.h
+@@ -30,7 +30,7 @@ DEFINE_POINTER(Executor);
+ 
+ enum InnerSearchMode { KNN_SEARCH = 1, RANGE_SEARCH = 2 };
+ 
+-enum InnerSearchType { PURE = 1, WITH_FILTER = 2 };
++enum InnerSearchType { PURE_SEARCH = 1, WITH_FILTER = 2 };
+ 
+ class InnerSearchParam {
+ public:
+diff --git a/src/index/hnsw.cpp b/src/index/hnsw.cpp
+index 769f3bee..773e1705 100644
+--- a/src/index/hnsw.cpp
++++ b/src/index/hnsw.cpp
+@@ -282,7 +282,7 @@ HNSW::knn_search(const DatasetPtr& query,
+ 
+         // check search parameters
+         auto params = HnswSearchParameters::FromJson(parameters);
+-        auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, 1000L);
++        auto ef_search_threshold = std::max(AMPLIFICATION_FACTOR * k, int64_t{1000});
+         CHECK_ARGUMENT(  // NOLINT
+             (1 <= params.ef_search) and (params.ef_search <= ef_search_threshold),
+             fmt::format(
+diff --git a/src/index/hnsw_zparameters.cpp b/src/index/hnsw_zparameters.cpp
+index 0b158fab..9c865e05 100644
+--- a/src/index/hnsw_zparameters.cpp
++++ b/src/index/hnsw_zparameters.cpp
+@@ -58,7 +58,7 @@ HnswParameters::FromJson(const JsonType& hnsw_param_obj,
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_M].IsNumberInteger(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_M));
+     obj.max_degree = hnsw_param_obj[HNSW_PARAMETER_M].GetInt();
+-    auto max_degree_threshold = std::max(index_common_param.dim_, 128L);
++    auto max_degree_threshold = std::max(index_common_param.dim_, int64_t{128});
+     CHECK_ARGUMENT(  // NOLINT
+         (4 <= obj.max_degree) and (obj.max_degree <= max_degree_threshold),
+         fmt::format("max_degree({}) must in range[4, {}]", obj.max_degree, max_degree_threshold));
+@@ -70,7 +70,7 @@ HnswParameters::FromJson(const JsonType& hnsw_param_obj,
+     CHECK_ARGUMENT(hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION].IsNumberInteger(),
+                    fmt::format("parameters[{}] must be integer type", HNSW_PARAMETER_CONSTRUCTION));
+     obj.ef_construction = hnsw_param_obj[HNSW_PARAMETER_CONSTRUCTION].GetInt();
+-    auto construction_threshold = std::max(1000L, AMPLIFICATION_FACTOR * obj.max_degree);
++    auto construction_threshold = std::max(int64_t{1000}, AMPLIFICATION_FACTOR * obj.max_degree);
+     CHECK_ARGUMENT((obj.max_degree <= obj.ef_construction) and  // NOLINT
+                        (obj.ef_construction <= construction_threshold),
+                    fmt::format("ef_construction({}) must in range[$max_degree({}), {}]",
+diff --git a/src/index/index_impl_test.cpp b/src/index/index_impl_test.cpp
+index a813735f..91d47f78 100644
+--- a/src/index/index_impl_test.cpp
++++ b/src/index/index_impl_test.cpp
+@@ -196,7 +196,7 @@ public:
+     }
+ 
+     void*
+-    Allocate(size_t size) override {
++    Allocate(AllocatorSize size) override {
+         auto addr = static_cast<void*>(malloc(size));
+         return addr;
+     }
+@@ -207,7 +207,7 @@ public:
+     }
+ 
+     void*
+-    Reallocate(void* p, size_t size) override {
++    Reallocate(void* p, AllocatorSize size) override {
+         auto addr = static_cast<void*>(realloc(p, size));
+         return addr;
+     }
+diff --git a/src/io/CMakeLists.txt b/src/io/CMakeLists.txt
+index 199731c2..79b4aa82 100644
+--- a/src/io/CMakeLists.txt
++++ b/src/io/CMakeLists.txt
+@@ -31,6 +31,11 @@ set (IO_SRC
+ )
+ 
+ add_library (io OBJECT ${IO_SRC})
++if (APPLE)
++    # Preserve the archive expected by seekdb's macOS link inputs.
++    add_library (io_static STATIC $<TARGET_OBJECTS:io>)
++    set_target_properties (io_static PROPERTIES OUTPUT_NAME io)
++endif ()
+ if (HAVE_LIBAIO)
+     target_compile_definitions (io PUBLIC -DHAVE_LIBAIO=1)
+     target_link_libraries (io PUBLIC fmt::fmt aio coverage_config)
+diff --git a/src/io/buffer_io.cpp b/src/io/buffer_io.cpp
+index 9cd53f41..b722ee56 100644
+--- a/src/io/buffer_io.cpp
++++ b/src/io/buffer_io.cpp
+@@ -16,9 +16,17 @@
+ #include "buffer_io.h"
+ 
+ #include <fcntl.h>
++#if defined(_WIN32)
++#include <io.h>
++#include <share.h>
++#include <sys/stat.h>
++#else
+ #include <unistd.h>
++#endif
+ 
++#include <algorithm>
+ #include <filesystem>
++#include <limits>
+ 
+ namespace vsag {
+ 
+@@ -29,10 +37,21 @@ BufferIO::BufferIO(std::string filename, Allocator* allocator)
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("{} is a directory", this->filepath_));
+     }
++#if defined(_WIN32)
++    const int open_error = _sopen_s(&this->fd_, filepath_.c_str(),
++                                    _O_CREAT | _O_RDWR | _O_BINARY,
++                                    _SH_DENYNO, _S_IREAD | _S_IWRITE);
++#else
+     this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
++#endif
+     if (this->fd_ < 0) {
++#if defined(_WIN32)
++        throw VsagException(ErrorType::INTERNAL_ERROR,
++                            fmt::format("open file {} error {}", this->filepath_, open_error));
++#else
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
++#endif
+     }
+ }
+ 
+@@ -44,7 +63,22 @@ BufferIO::BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param
+ 
+ void
+ BufferIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+-    auto ret = pwrite64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before write failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int written = _write(this->fd_, data + ret, chunk);
++        if (written <= 0) break;
++        ret += written;
++    }
++#else
++    auto ret = pwrite(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("write bytes {} less than {}", ret, size));
+@@ -59,7 +93,22 @@ BufferIO::ReadImpl(uint64_t size, uint64_t offset, uint8_t* data) const {
+     if (size == 0) {
+         return true;
+     }
+-    auto ret = pread64(this->fd_, data, size, static_cast<int64_t>(offset));
++#if defined(_WIN32)
++    std::lock_guard<std::mutex> lock(io_mutex_);
++    if (_lseeki64(this->fd_, static_cast<__int64>(offset), SEEK_SET) < 0) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "seek before read failed");
++    }
++    uint64_t ret = 0;
++    while (ret < size) {
++        const auto chunk = static_cast<unsigned int>(
++            std::min<uint64_t>(size - ret, std::numeric_limits<int>::max()));
++        const int received = _read(this->fd_, data + ret, chunk);
++        if (received <= 0) break;
++        ret += received;
++    }
++#else
++    auto ret = pread(this->fd_, data, size, static_cast<off_t>(offset));
++#endif
+     if (ret != size) {
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("read bytes {} less than {}", ret, size));
+diff --git a/src/io/buffer_io.h b/src/io/buffer_io.h
+index 9f36f7d8..43c7e754 100644
+--- a/src/io/buffer_io.h
++++ b/src/io/buffer_io.h
+@@ -15,7 +15,12 @@
+ 
+ #pragma once
+ 
++#if defined(_WIN32)
++#include <io.h>
++#include <mutex>
++#else
+ #include <unistd.h>
++#endif
+ 
+ #include <filesystem>
+ 
+@@ -38,7 +43,11 @@ public:
+     explicit BufferIO(const IOParamPtr& param, const IndexCommonParam& common_param);
+ 
+     ~BufferIO() override {
++#if defined(_WIN32)
++        _close(this->fd_);
++#else
+         close(this->fd_);
++#endif
+         // remove file
+         if (not this->exist_file_) {
+             std::filesystem::remove(this->filepath_);
+@@ -66,5 +75,9 @@ private:
+     int fd_{-1};
+ 
+     bool exist_file_{false};
++
++#if defined(_WIN32)
++    mutable std::mutex io_mutex_;
++#endif
+ };
+ }  // namespace vsag
+diff --git a/src/io/mmap_io.cpp b/src/io/mmap_io.cpp
+index 1ed8a547..4aa6f7d2 100644
+--- a/src/io/mmap_io.cpp
++++ b/src/io/mmap_io.cpp
+@@ -16,8 +16,16 @@
+ #include "mmap_io.h"
+ 
+ #include <fcntl.h>
++#if defined(_WIN32)
++#include <io.h>
++#include <share.h>
++#include <sys/stat.h>
++#define NOMINMAX
++#include <windows.h>
++#else
+ #include <sys/mman.h>
+ #include <unistd.h>
++#endif
+ 
+ #include <filesystem>
+ #include <utility>
+@@ -26,6 +34,28 @@
+ 
+ namespace vsag {
+ 
++#if defined(_WIN32)
++static uint8_t*
++map_file(int fd, uint64_t size) {
++    const auto file = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
++    HANDLE mapping = CreateFileMappingW(file,
++                                        nullptr,
++                                        PAGE_READWRITE,
++                                        static_cast<DWORD>(size >> 32),
++                                        static_cast<DWORD>(size),
++                                        nullptr);
++    if (mapping == nullptr) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "CreateFileMapping failed");
++    }
++    void* address = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
++    CloseHandle(mapping);
++    if (address == nullptr) {
++        throw VsagException(ErrorType::INTERNAL_ERROR, "MapViewOfFile failed");
++    }
++    return static_cast<uint8_t*>(address);
++}
++#endif
++
+ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+     : BasicIO<MMapIO>(allocator), filepath_(std::move(filename)) {
+     this->exist_file_ = std::filesystem::exists(this->filepath_);
+@@ -34,21 +64,40 @@ MMapIO::MMapIO(std::string filename, Allocator* allocator)
+                             fmt::format("{} is a directory", this->filepath_));
+     }
+ 
++#if defined(_WIN32)
++    const int open_error = _sopen_s(&this->fd_, filepath_.c_str(),
++                                    _O_CREAT | _O_RDWR | _O_BINARY,
++                                    _SH_DENYNO, _S_IREAD | _S_IWRITE);
++#else
+     this->fd_ = open(filepath_.c_str(), O_CREAT | O_RDWR, 0644);
++#endif
+     if (this->fd_ < 0) {
++#if defined(_WIN32)
++        throw VsagException(ErrorType::INTERNAL_ERROR,
++                            fmt::format("open file {} error {}", this->filepath_, open_error));
++#else
+         throw VsagException(ErrorType::INTERNAL_ERROR,
+                             fmt::format("open file {} error {}", this->filepath_, strerror(errno)));
++#endif
+     }
+     auto mmap_size = this->size_;
+     if (this->size_ == 0) {
+         mmap_size = DEFAULT_INIT_MMAP_SIZE;
+-        auto ret = ftruncate64(this->fd_, static_cast<int64_t>(mmap_size));
+-        if (ret == -1) {
+-            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate64 failed");
++#if defined(_WIN32)
++        auto ret = _chsize_s(this->fd_, mmap_size);
++#else
++        auto ret = ftruncate(this->fd_, static_cast<off_t>(mmap_size));
++#endif
++        if (ret != 0) {
++            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate failed");
+         }
+     }
++#if defined(_WIN32)
++    this->start_ = map_file(this->fd_, mmap_size);
++#else
+     void* addr = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd_, 0);
+     this->start_ = static_cast<uint8_t*>(addr);
++#endif
+ }
+ 
+ MMapIO::MMapIO(const MMapIOParamPtr& io_param, const IndexCommonParam& common_param)
+@@ -58,8 +107,13 @@ MMapIO::MMapIO(const IOParamPtr& param, const IndexCommonParam& common_param)
+     : MMapIO(std::dynamic_pointer_cast<MMapIOParameter>(param), common_param){};
+ 
+ MMapIO::~MMapIO() {
++#if defined(_WIN32)
++    UnmapViewOfFile(this->start_);
++    _close(this->fd_);
++#else
+     munmap(this->start_, this->size_);
+     close(this->fd_);
++#endif
+     // remove file
+     if (not this->exist_file_) {
+         std::filesystem::remove(this->filepath_);
+@@ -74,12 +128,28 @@ MMapIO::WriteImpl(const uint8_t* data, uint64_t size, uint64_t offset) {
+         old_size = DEFAULT_INIT_MMAP_SIZE;
+     }
+     if (new_size > old_size) {
+-        auto ret = ftruncate64(this->fd_, static_cast<int64_t>(new_size));
+-        if (ret == -1) {
+-            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate64 failed");
++#if defined(_WIN32)
++        UnmapViewOfFile(this->start_);
++        auto ret = _chsize_s(this->fd_, new_size);
++#else
++        auto ret = ftruncate(this->fd_, static_cast<off_t>(new_size));
++#endif
++        if (ret != 0) {
++            throw VsagException(ErrorType::INTERNAL_ERROR, "ftruncate failed");
++        }
++#if defined(_WIN32)
++        this->start_ = map_file(this->fd_, new_size);
++#elif defined(__APPLE__)
++        void* new_mapping = mmap(nullptr, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd_, 0);
++        if (new_mapping == MAP_FAILED) {
++            throw VsagException(ErrorType::INTERNAL_ERROR, "mmap failed");
+         }
++        munmap(this->start_, old_size);
++        this->start_ = static_cast<uint8_t*>(new_mapping);
++#else
+         this->start_ =
+             static_cast<uint8_t*>(mremap(this->start_, old_size, new_size, MREMAP_MAYMOVE));
++#endif
+     }
+     this->size_ = std::max(this->size_, new_size);
+     memcpy(this->start_ + offset, data, size);
+@@ -115,4 +185,4 @@ MMapIO::MultiReadImpl(uint8_t* datas, uint64_t* sizes, uint64_t* offsets, uint64
+     return ret;
+ }
+ 
+-}  // namespace vsag
+\ No newline at end of file
++}  // namespace vsag
+diff --git a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+index 38690d8f..9c30bf5e 100644
+--- a/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
++++ b/src/quantization/product_quantization/pq_fastscan_quantizer.cpp
+@@ -66,7 +66,7 @@ PQFastScanQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t coun
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+diff --git a/src/quantization/product_quantization/product_quantizer.cpp b/src/quantization/product_quantization/product_quantizer.cpp
+index e65a13d2..b5e98d9c 100644
+--- a/src/quantization/product_quantization/product_quantizer.cpp
++++ b/src/quantization/product_quantization/product_quantizer.cpp
+@@ -61,7 +61,7 @@ ProductQuantizer<metric>::TrainImpl(const vsag::DataType* data, uint64_t count)
+     if (this->is_trained_) {
+         return true;
+     }
+-    count = std::min(count, 65536UL);
++    count = std::min<uint64_t>(count, 65536);
+     Vector<float> slice(this->allocator_);
+     slice.resize(count * subspace_dim_);
+     Vector<float> norm_data(this->allocator_);
+@@ -375,4 +375,4 @@ ProductQuantizer<metric>::ProcessQueryImpl(const DataType* query,
+ }
+ 
+ TEMPLATE_QUANTIZER(ProductQuantizer)
+-}  // namespace vsag
+\ No newline at end of file
++}  // namespace vsag
+diff --git a/src/quantization/quantizer_adapter.cpp b/src/quantization/quantizer_adapter.cpp
+index 5043c545..722e8f30 100644
+--- a/src/quantization/quantizer_adapter.cpp
++++ b/src/quantization/quantizer_adapter.cpp
+@@ -36,7 +36,7 @@ QuantizerAdapter<QuantT, DataT>::QuantizerAdapter(const QuantizerParamPtr& param
+ 
+ template <typename QuantT, typename DataT>
+ bool
+-QuantizerAdapter<QuantT, DataT>::TrainImpl(const DataType* data, size_t count) {
++QuantizerAdapter<QuantT, DataT>::TrainImpl(const DataType* data, uint64_t count) {
+     if constexpr (std::is_same_v<DataT, int8_t>) {
+         const auto* data_int8 = reinterpret_cast<const int8_t*>(data);
+         Vector<DataType> vec(this->dim_ * count, this->allocator_);
+diff --git a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+index 15ae4ee7..1e021066 100644
+--- a/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
++++ b/src/quantization/scalar_quantization/sq8_uniform_quantizer.cpp
+@@ -33,11 +33,11 @@ SQ8UniformQuantizer<metric>::SQ8UniformQuantizer(int dim, Allocator* allocator)
+ 
+     uint64_t align_size = 1;
+     if constexpr (metric == MetricType::METRIC_TYPE_L2SQR) {
+-        align_size = std::max(align_size, sizeof(norm_type));
++        align_size = std::max<uint64_t>(align_size, sizeof(norm_type));
+     }
+     if constexpr (metric == MetricType::METRIC_TYPE_IP or
+                   metric == MetricType::METRIC_TYPE_COSINE) {
+-        align_size = std::max(align_size, sizeof(sum_type));
++        align_size = std::max<uint64_t>(align_size, sizeof(sum_type));
+     }
+     this->code_size_ = 0;
+ 
+diff --git a/src/reader.cpp b/src/reader.cpp
+index 9fe1310f..4d729631 100644
+--- a/src/reader.cpp
++++ b/src/reader.cpp
+@@ -1 +1,2 @@
++#include <atomic>
+ #include <fmt/format.h>
+diff --git a/src/simd/CMakeLists.txt b/src/simd/CMakeLists.txt
+index 10075a1c..0ca45017 100644
+--- a/src/simd/CMakeLists.txt
++++ b/src/simd/CMakeLists.txt
+@@ -43,7 +43,7 @@ if (DIST_CONTAINS_SSE)
+     set_source_files_properties (
+             sse.cpp
+             PROPERTIES COMPILE_FLAGS
+-            "-msse -msse2 -msse3 -mssse3 -msse4 -msse4a -msse4.1 -msse4.2")
++            "-msse -msse2 -msse3 -mssse3 -msse4a -msse4.1 -msse4.2")
+ endif ()
+ if (DIST_CONTAINS_AVX)
+     set_source_files_properties (avx.cpp PROPERTIES COMPILE_FLAGS "-mavx -mf16c")
+@@ -56,7 +56,7 @@ if (DIST_CONTAINS_AVX512)
+             avx512.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi"
+     )
+ endif ()
+ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+@@ -64,7 +64,7 @@ if (DIST_CONTAINS_AVX512VPOPCNTDQ)
+             avx512vpopcntdq.cpp
+             PROPERTIES
+             COMPILE_FLAGS
+-            "-mavx512f -mavx512pf -mavx512er -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
++            "-mavx512f -mavx512cd -mavx512vl -mavx512bw -mavx512dq -mavx512ifma -mavx512vbmi -mavx512vpopcntdq"
+     )
+ endif ()
+ if (DIST_CONTAINS_NEON)
+@@ -75,6 +75,7 @@ if (DIST_CONTAINS_SVE)
+ endif ()
+ 
+ 
++if (NOT MSVC)
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorize")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-malloc")
+@@ -83,6 +84,9 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-realloc")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-free")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -fopenmp-simd")
+ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops")
++else ()
++set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /openmp")
++endif ()
+ 
+ add_library (simd STATIC ${SIMD_SRCS})
+ 
+diff --git a/src/simd/sse.cpp b/src/simd/sse.cpp
+index accbdeb7..364d9967 100644
+--- a/src/simd/sse.cpp
++++ b/src/simd/sse.cpp
+@@ -1142,7 +1142,7 @@ Normalize(const float* from, float* to, uint64_t dim) {
+ void
+ Prefetch(const void* data) {
+ #if defined(ENABLE_SSE)
+-    _mm_prefetch(data, _MM_HINT_T0);
++    _mm_prefetch(reinterpret_cast<const char*>(data), _MM_HINT_T0);
+ #endif
+ };
+ 
+diff --git a/src/storage/stream_reader.cpp b/src/storage/stream_reader.cpp
+index d8914711..2aa06945 100644
+--- a/src/storage/stream_reader.cpp
++++ b/src/storage/stream_reader.cpp
+@@ -125,7 +125,8 @@ BufferStreamReader::Read(char* data, uint64_t size) {
+ 
+         // If there is available data in buffer_, copy it to dest
+         if (available_in_src > 0) {
+-            size_t bytes_to_copy = std::min(size - total_copied, available_in_src);
++            size_t bytes_to_copy =
++                static_cast<size_t>(std::min<uint64_t>(size - total_copied, available_in_src));
+             memcpy(data + total_copied, buffer_ + buffer_cursor_, bytes_to_copy);
+             total_copied += bytes_to_copy;
+             buffer_cursor_ += bytes_to_copy;
+diff --git a/src/utils/prefetch.cpp b/src/utils/prefetch.cpp
+index 6aa86c35..22037eb5 100644
+--- a/src/utils/prefetch.cpp
++++ b/src/utils/prefetch.cpp
+@@ -27,7 +27,7 @@ PrefetchImpl<0>(const void* data){};
+ 
+ void
+ PrefetchLines(const void* data, uint64_t size) {
+-    uint64_t n = std::min(size / 64, 63UL);
++    uint64_t n = std::min<uint64_t>(size / 64, 63);
+     switch (n) {
+         PREFETCH_LINE(0);
+         PREFETCH_LINE(1);
+diff --git a/src/utils/util_functions.cpp b/src/utils/util_functions.cpp
+index 94d25e88..dd383fe6 100644
+--- a/src/utils/util_functions.cpp
++++ b/src/utils/util_functions.cpp
+@@ -165,7 +165,11 @@ get_current_time() {
+     auto now = std::chrono::system_clock::now();
+     auto now_c = std::chrono::system_clock::to_time_t(now);
+     std::tm now_tm{};
++#ifdef _WIN32
++    if (localtime_s(&now_tm, &now_c) != 0) {
++#else
+     if (localtime_r(&now_c, &now_tm) == nullptr) {
++#endif
+         return "invalid time";
+     }
+     std::ostringstream oss;

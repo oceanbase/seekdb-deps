@@ -123,7 +123,7 @@ def create_archive(source_root, output):
 
     digest = sha256_file(output)
     checksum = output.with_name(output.name + ".sha256")
-    checksum.write_text("{}  {}\n".format(digest, output.name), encoding="ascii")
+    checksum.write_bytes("{}  {}\n".format(digest, output.name).encode("ascii"))
     output.chmod(0o644)
     checksum.chmod(0o644)
     return {"path": output, "sha256": digest, "checksum": checksum}
