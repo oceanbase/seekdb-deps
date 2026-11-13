@@ -32,6 +32,9 @@ on:
           - linux-x86_64-glibc217
           - linux-aarch64-glibc217
           - macos-arm64-min13
+          - ios-arm64-device-min18
+          - ios-arm64-simulator-min18
+          - wasm32-emscripten
           - windows-x86_64-md
           - windows-x86_64-mt
           - android-arm64-v8a-api26
@@ -147,6 +150,23 @@ jobs:
           MSYS2_LOCATION: ${{ steps.jemalloc_msys2.outputs.msys2-location }}
         run: '"MSYS2_LOCATION=$env:MSYS2_LOCATION" >> $env:GITHUB_ENV'
 
+      - name: Select Apple VSAG OpenMP compiler
+        if: ${{ (matrix.target.family == 'macos' || matrix.target.family == 'ios') && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
+        shell: bash
+        run: |
+          brew install llvm libomp
+          llvm_prefix="$(brew --prefix llvm)"
+          echo "CC=$llvm_prefix/bin/clang" >> "$GITHUB_ENV"
+          echo "CXX=$llvm_prefix/bin/clang++" >> "$GITHUB_ENV"
+
+      - name: Select Windows VSAG Clang compiler
+        if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command clang-cl.exe -ErrorAction Stop).Source
+          "CC=$compiler" >> $env:GITHUB_ENV
+          "CXX=$compiler" >> $env:GITHUB_ENV
+
       - uses: mamba-org/setup-micromamba@v3
         if: ${{ matrix.target.family == 'linux' }}
         with:
@@ -154,9 +174,19 @@ jobs:
           create-args: >-
             -c conda-forge --strict-channel-priority
             python=3.11 cmake ninja
-            gcc_linux-${{ matrix.target.conda_arch }}=12
-            gxx_linux-${{ matrix.target.conda_arch }}=12
+            gcc_linux-${{ matrix.target.conda_arch }}=${{ matrix.target.compiler_version }}
+            gxx_linux-${{ matrix.target.conda_arch }}=${{ matrix.target.compiler_version }}
+            ${{ matrix.target.conda_extra }}
             sysroot_linux-${{ matrix.target.conda_arch }}=2.17
+
+      - name: Install Linux system build dependencies
+        if: ${{ matrix.target.family == 'linux' && matrix.target.system_packages != '' }}
+        env:
+          SYSTEM_PACKAGES: ${{ matrix.target.system_packages }}
+        run: |
+          read -r -a packages <<< "$SYSTEM_PACKAGES"
+          sudo apt-get update
+          sudo apt-get install -y -- "${packages[@]}"
 
       - uses: actions/setup-java@v6
         if: ${{ matrix.target.family == 'android' }}
@@ -179,6 +209,19 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$sdk_root/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
+      - name: Install Emscripten SDK
+        if: ${{ matrix.target.family == 'wasm' }}
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.12
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          emcc --version
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
+          IFS=: read -ra path_entries <<< "$PATH"
+          printf '%s\n' "${path_entries[@]}" >> "$GITHUB_PATH"
+
       - name: Build Linux binary
         if: ${{ matrix.target.family == 'linux' }}
         shell: bash -el {0}
@@ -197,6 +240,17 @@ jobs:
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
           --kind binary --target macos-arm64-min13 --timestamp "$RELEASE_TIMESTAMP"
           --jobs "$BUILD_JOBS" --output dist
+
+      - name: Build iOS or WASM binary
+        if: ${{ matrix.target.family == 'ios' || matrix.target.family == 'wasm' }}
+        shell: bash
+        run: |
+          if [ "${{ matrix.target.family }}" = wasm ]; then
+            source "$EMSDK/emsdk_env.sh"
+          fi
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION" \
+            --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP" \
+            --jobs "$BUILD_JOBS" --output dist
 
       - name: Build Windows binary
         if: ${{ matrix.target.family == 'windows' }}

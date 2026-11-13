@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "name": "vsag",
+  "version": "0.16.20",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "ios-arm64-device-min18",
+    "ios-arm64-simulator-min18",
+    "wasm32-emscripten",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
+  ],
+  "build_dependencies": {
+    "linux": {
+      "compilers": ["fortran"],
+      "system_packages": ["libaio-dev"]
+    }
+  },
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.16.20",
+    "repository": "https://github.com/antgroup/vsag.git",
+    "tag": "v0.16.20",
+    "revision": "8f816da5fdf3cb1696c1f0169bf516781351e573",
+    "archive_sha256": "edb2c27012412bfaba6e3a0f621fcd24e9885986a5a81b616998b0a629dc78da",
+    "strip_prefix": "vsag-0.16.20"
+  },
+  "recipe": "recipes/build.py",
+  "patches": ["patches/build-adjustments.patch", "patches/apple-cross.patch", "patches/wasm-cross.patch"],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "linux": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libgfortran_static.a",
+      "lib/libgomp_static.a"
+    ],
+    "macos": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libio.a",
+      "lib/libomp_static.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "ios": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libio.a",
+      "lib/libomp_static.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "wasm": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "windows": [
+      "include/vsag/vsag.h",
+      "lib/vsag_static.lib",
+      "lib/simd.lib",
+      "lib/cpuinfo.lib",
+      "lib/diskann.lib",
+      "lib/openblas.lib",
+      "lib/libomp.lib",
+      "bin/libomp.dll",
+      "lib/antlr4-runtime-static.lib",
+      "lib/antlr4-autogen.lib",
+      "lib/fmt.lib"
+    ],
+    "android": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libspdlog.a"
+    ]
+  }
+}

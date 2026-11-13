@@ -43,9 +43,9 @@ python3 scripts/package.py zlib 1.4 --kind binary \
   --target linux-x86_64-glibc217
 ```
 
-Use `--timestamp YYYYMMDDTHHMMSS+0000` to set the artifact timestamp and `--jobs N` to set parallel build jobs. By default, the timestamp is the current UTC time and output goes to `dist/`.
+Use `--timestamp YYYYMMDDTHHMMSS+0000` to set the artifact timestamp and `--jobs N` to set parallel build jobs. By default, the timestamp is the current UTC time to the second and output goes to `dist/`.
 
-Artifact names contain the package version, source/binary kind, target for binary packages, UTC timestamp, and the first 12 characters of the seekdb-deps commit. Target names describe the package ABI and do not encode the compiler. Each archive has a `.sha256` sidecar. `manifest.json` inside the archive records the seekdb-deps revision, upstream source identity and checksum, ordered patch digests, target profile, the actual build environment for provenance, license, and per-file hashes.
+Artifact names contain the package version, source/binary kind, target for binary packages, UTC timestamp with the `+0000` offset, and the first 12 characters of the seekdb-deps commit. For example, `zlib-1.4-bin-linux-x86_64-glibc217-20261110T123456+0000-abcdef123456.tar.gz`. Target names describe the package ABI and do not encode the compiler. Each archive has a `.sha256` sidecar. `manifest.json` inside the archive records the full repository and upstream revisions, release timestamp, ordered patch digests, target profile, the actual build environment for provenance, license, and per-file hashes.
 
 ## Target profiles
 

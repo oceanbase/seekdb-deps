@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "name": "vsag",
+  "version": "0.18.16",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
+  ],
+  "build_dependencies": {
+    "linux": {
+      "system_packages": [
+        "libaio-dev"
+      ]
+    }
+  },
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/antgroup/vsag/tar.gz/refs/tags/v0.18.16",
+    "repository": "https://github.com/antgroup/vsag.git",
+    "tag": "v0.18.16",
+    "revision": "3fc9177b9bc471e939a46e1f52ecd22591487fcd",
+    "archive_sha256": "ab76a82aafb67b804dc4446c9d46962a3f6eada15a069576a476cb8334ecf1cc",
+    "strip_prefix": "vsag-0.18.16"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [
+    "patches/build-adjustments.patch"
+  ],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "linux": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libgomp_static.a"
+    ],
+    "macos": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libio.a",
+      "lib/libomp_static.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a"
+    ],
+    "windows": [
+      "include/vsag/vsag.h",
+      "lib/vsag_static.lib",
+      "lib/simd.lib",
+      "lib/cpuinfo.lib",
+      "lib/diskann.lib",
+      "lib/openblas.lib",
+      "lib/libomp.lib",
+      "bin/libomp.dll",
+      "lib/antlr4-runtime-static.lib",
+      "lib/antlr4-autogen.lib",
+      "lib/fmt.lib"
+    ],
+    "android": [
+      "include/vsag/vsag.h",
+      "lib/libvsag_static.a",
+      "lib/libsimd.a",
+      "lib/libcpuinfo.a",
+      "lib/libdiskann.a",
+      "lib/libopenblas.a",
+      "lib/libantlr4-runtime.a",
+      "lib/libantlr4-autogen.a",
+      "lib/libfmt.a",
+      "lib/libspdlog.a"
+    ]
+  }
+}

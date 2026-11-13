@@ -97,18 +97,16 @@ def package_paths(name, version):
         raise ValueError("Invalid Cargo registry package coordinates")
     if not re.match(r"^[0-9a-fA-F]{64}$", source["archive_sha256"]):
         raise ValueError("Package source archive_sha256 must be a SHA256 digest")
-    if "supported_targets" in metadata:
-        targets = metadata["supported_targets"]
-        if not isinstance(targets, list) or not targets:
-            raise ValueError("Package supported_targets must be a nonempty list")
-        for target in targets:
-            if (not isinstance(target, str)
-                    or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target)
-                    or not (ROOT / "platforms" / (target + ".json")).is_file()):
-                raise ValueError("Unknown supported target: " + str(target))
     for field in ("spdx_id", "source_path"):
         if field not in metadata["license"]:
             raise ValueError("Package license metadata is missing field: " + field)
+    if "supported_targets" in metadata and (not isinstance(metadata["supported_targets"], list)
+            or not metadata["supported_targets"]):
+        raise ValueError("Package supported_targets must be a nonempty list")
+    for target in metadata.get("supported_targets", []):
+        if (not isinstance(target, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target)
+                or not (ROOT / "platforms" / (target + ".json")).is_file()):
+            raise ValueError("Unknown supported target: " + str(target))
     return root, metadata
 
 
@@ -310,10 +308,15 @@ def apply_patches(package_root, metadata, source_dir, workspace):
     patches = patch_records(package_root, metadata)
     prepared = workspace / "source"
     copy_tree(source_dir, prepared)
-    for patch in patches:
-        patch_path = package_root / patch["path"]
-        run(["git", "apply", "--check", str(patch_path)], cwd=prepared)
-        run(["git", "apply", "--binary", str(patch_path)], cwd=prepared)
+    if patches:
+        run(["git", "init", "--quiet"], cwd=prepared)
+        try:
+            for patch in patches:
+                patch_path = package_root / patch["path"]
+                run(["git", "-c", "core.autocrlf=false", "apply", "--check", str(patch_path)], cwd=prepared)
+                run(["git", "-c", "core.autocrlf=false", "apply", "--binary", str(patch_path)], cwd=prepared)
+        finally:
+            shutil.rmtree(str(prepared / ".git"))
     return prepared, patches
 
 
@@ -453,7 +456,8 @@ def main():
     parser.add_argument("--kind", choices=("source", "binary", "both"), default="both")
     parser.add_argument("--target", help="target profile ID; required for binary packages")
     parser.add_argument("--output", default=str(ROOT / "dist"))
-    parser.add_argument("--timestamp", default=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%z"), help="artifact timestamp (YYYYMMDDTHHMMSS+0000, UTC)")
+    parser.add_argument("--timestamp", default=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%z"),
+                        help="artifact timestamp (YYYYMMDDTHHMMSS+0000, UTC)")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
     args = parser.parse_args()
 
