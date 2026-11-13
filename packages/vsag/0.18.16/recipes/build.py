@@ -1,13 +1,14 @@
 """Build VSAG and stage the archives used by seekdb on each platform."""
 
 from pathlib import Path
-import hashlib
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tarfile
+
+from archive import sha256_file
 
 
 LIBOMP_VERSION = "23.1.5"
@@ -76,13 +77,26 @@ def _compiler_library(ctx, compiler, name):
     return Path(path)
 
 
+def _verify_macos_deployment_target(ctx, archive):
+    readobj = Path(ctx.environment["CXX"]).resolve().parent / "llvm-readobj"
+    metadata = subprocess.check_output(
+        [str(readobj), "--macho-version-min", str(archive)],
+        env=ctx.environment, text=True,
+    )
+    minimum_versions = re.findall(r"\bVersion: (\d+)\.(\d+)\b", metadata)
+    target_version = tuple(map(int, ctx.target.document["abi"]["minimum_os_version"].split(".")))
+    if not minimum_versions or any(
+        tuple(map(int, version)) > target_version for version in minimum_versions
+    ):
+        raise ValueError(str(archive) + " exceeds macOS deployment target")
+
+
 def _build_macos_openmp(ctx):
     archive = ctx.build_dir / ("llvm-project-" + LIBOMP_VERSION + ".src.tar.xz")
     url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
            + "/" + archive.name)
     ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
-    with archive.open("rb") as input_file:
-        actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+    actual_sha256 = sha256_file(archive)
     if actual_sha256 != LIBOMP_SOURCE_SHA256:
         raise ValueError("LLVM OpenMP source SHA256 mismatch: " + actual_sha256)
 
@@ -126,8 +140,7 @@ def _build_windows_openmp(ctx):
         url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-"
                + WINDOWS_LIBOMP_VERSION + "/" + archive.name)
         ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
-        with archive.open("rb") as input_file:
-            actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+        actual_sha256 = sha256_file(archive)
         if actual_sha256 != expected_sha256:
             raise ValueError("LLVM " + component + " source SHA256 mismatch: " + actual_sha256)
         with tarfile.open(archive, "r:xz") as source:
@@ -207,10 +220,15 @@ def build(ctx):
     libraries = WINDOWS_LIBRARIES if ctx.target.family == "windows" else LIBRARIES
     staged_libraries = []
     for name, candidates in libraries.items():
-        ctx.install(_built_library(ctx, candidates), "lib/" + name)
+        archive = _built_library(ctx, candidates)
+        if ctx.target.family == "macos":
+            _verify_macos_deployment_target(ctx, archive)
+        ctx.install(archive, "lib/" + name)
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "macos":
-        ctx.install(_built_library(ctx, ("src/io/libio.a",)), "lib/libio.a")
+        io_archive = _built_library(ctx, ("src/io/libio.a",))
+        _verify_macos_deployment_target(ctx, io_archive)
+        ctx.install(io_archive, "lib/libio.a")
         ctx.install(_build_macos_openmp(ctx), "lib/libomp_static.a")
     if ctx.target.family == "windows":
         openmp = _build_windows_openmp(ctx)

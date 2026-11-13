@@ -63,7 +63,7 @@ index 8846f0ad..89e4d708 100644
  
  set (ld_flags
          "-L${CMAKE_INSTALL_PREFIX}/lib"
-@@ -188,20 +202,36 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
+@@ -188,20 +202,42 @@ if (EXISTS "/opt/alibaba-cloud-compiler/lib64/")
  endif ()
  string (JOIN " " ld_flags ${ld_flags})
  
@@ -87,6 +87,12 @@ index 8846f0ad..89e4d708 100644
          "-DCMAKE_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include"
          "-DCMAKE_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/lib:/opt/alibaba-cloud-compiler/lib64"
  )
++if (APPLE)
++    list (APPEND common_cmake_args
++        "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
++        "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
++        "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}")
++endif ()
 +if (MSVC)
 +    list (APPEND common_cmake_args
 +        "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW"
@@ -104,7 +110,7 @@ index 8846f0ad..89e4d708 100644
  
  set (common_configure_envs
          "env"
-@@ -231,7 +256,9 @@ include (extern/openblas/openblas.cmake)
+@@ -231,7 +262,9 @@ include (extern/openblas/openblas.cmake)
  include (extern/mkl/mkl.cmake)
  include (extern/diskann/diskann.cmake)
  include (extern/spdlog/spdlog.cmake)
@@ -115,7 +121,7 @@ index 8846f0ad..89e4d708 100644
  include (extern/cpuinfo/cpuinfo.cmake)
  include (extern/fmt/fmt.cmake)
  include (extern/thread_pool/thread_pool.cmake)
-@@ -255,18 +282,27 @@ set (CMAKE_CXX_STANDARD 17)
+@@ -255,18 +288,27 @@ set (CMAKE_CXX_STANDARD 17)
  set (CMAKE_CXX_STANDARD_REQUIRED ON)
  
  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -149,7 +155,7 @@ index 8846f0ad..89e4d708 100644
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2")
  endif ()
  
-@@ -320,7 +356,9 @@ endif ()
+@@ -320,7 +362,9 @@ endif ()
  
  # sources
  add_subdirectory (src)
@@ -160,7 +166,7 @@ index 8846f0ad..89e4d708 100644
  if (ENABLE_EXAMPLES)
      add_subdirectory (examples/cpp)
  endif ()
-@@ -375,9 +413,10 @@ endif ()
+@@ -375,9 +419,10 @@ endif ()
  # version
  find_package (Git)
  add_custom_target (version
@@ -172,6 +178,15 @@ index 8846f0ad..89e4d708 100644
  )
  add_dependencies (vsag version)
 +add_dependencies (vsag_static version)
+diff --git a/cmake/GenerateVersionHeader.cmake b/cmake/GenerateVersionHeader.cmake
+--- a/cmake/GenerateVersionHeader.cmake
++++ b/cmake/GenerateVersionHeader.cmake
+@@ -17,4 +17,4 @@
+-if (GIT_EXECUTABLE)
++if (GIT_EXECUTABLE AND NOT DEFINED VSAG_VERSION)
+   get_filename_component (SRC_DIR ${SRC} DIRECTORY)
+   # Generate a git-describe version string from Git repository tags
+   execute_process (
 diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
 index b0571140..1fc3415f 100644
 --- a/extern/antlr4/antlr4.cmake

@@ -1,13 +1,14 @@
 """Build VSAG and stage the archives used by seekdb on each platform."""
 
 from pathlib import Path
-import hashlib
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tarfile
+
+from archive import sha256_file
 
 
 LIBOMP_VERSION = "23.1.5"
@@ -127,8 +128,7 @@ def _build_apple_openmp(ctx):
     url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-" + LIBOMP_VERSION
            + "/" + archive.name)
     ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
-    with archive.open("rb") as input_file:
-        actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+    actual_sha256 = sha256_file(archive)
     if actual_sha256 != LIBOMP_SOURCE_SHA256:
         raise ValueError("LLVM OpenMP source SHA256 mismatch: " + actual_sha256)
 
@@ -172,8 +172,7 @@ def _build_windows_openmp(ctx):
         url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-"
                + WINDOWS_LIBOMP_VERSION + "/" + archive.name)
         ctx.run(["curl", "--fail", "--location", "--retry", "3", "--output", archive, url])
-        with archive.open("rb") as input_file:
-            actual_sha256 = hashlib.file_digest(input_file, "sha256").hexdigest()
+        actual_sha256 = sha256_file(archive)
         if actual_sha256 != expected_sha256:
             raise ValueError("LLVM " + component + " source SHA256 mismatch: " + actual_sha256)
         with tarfile.open(archive, "r:xz") as source:
