@@ -47,8 +47,7 @@ def build(ctx):
         configure.append("--host=x86_64-w64-mingw32")
         runtime = ctx.target.document["abi"]["runtime"]
         existing_runtime = re.findall(r"/M[DT]d?\b", ctx.environment.get("CFLAGS", ""), re.I)
-        if any(flag[2:4].upper() != runtime or flag.lower().endswith("d")
-               for flag in existing_runtime):
+        if any(flag[1:].upper() != runtime for flag in existing_runtime):
             raise ValueError("CFLAGS conflicts with Windows target CRT: /" + runtime)
         flags.extend(["/O2", "/" + runtime, "/D_WIN32_WINNT=0x0A00"])
         msys2_root = ctx.environment.get("MSYS2_LOCATION")

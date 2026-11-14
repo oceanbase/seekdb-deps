@@ -196,27 +196,31 @@ diff --git a/extern/antlr4/antlr4.cmake b/extern/antlr4/antlr4.cmake
 index 95e0744..e63089a 100644
 --- a/extern/antlr4/antlr4.cmake
 +++ b/extern/antlr4/antlr4.cmake
-@@ -11,6 +11,10 @@ else ()
+@@ -11,6 +11,14 @@ else ()
  endif ()
  
  set (FULL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VSAG_ANTLR4_CXX11_ABI}")
++set (VSAG_ANTLR4_STATIC_CRT ON)
 +if (MSVC)
 +    # ANTLR4 4.13.2 uses std::chrono without including its header on MSVC.
 +    set (FULL_CXX_FLAGS "${FULL_CXX_FLAGS} /FIchrono")
++    if (CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "DLL")
++        set (VSAG_ANTLR4_STATIC_CRT OFF)
++    endif ()
 +endif ()
  
  ExternalProject_Add(
          ${name}
-@@ -28,7 +32,7 @@ ExternalProject_Add(
+@@ -28,7 +36,7 @@ ExternalProject_Add(
          BINARY_DIR ${binary_dir}
          BUILD_IN_SOURCE 0
          CONFIGURE_COMMAND
 -        cmake ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
-+        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_STATIC_CRT=ON -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
++        cmake -G Ninja ${common_cmake_args} -DCMAKE_CXX_FLAGS=${FULL_CXX_FLAGS} -DCMAKE_INSTALL_PREFIX=${install_dir} -DANTLR_BUILD_SHARED=OFF -DANTLR_BUILD_STATIC=ON -DWITH_STATIC_CRT=${VSAG_ANTLR4_STATIC_CRT} -DWITH_DEMO=False -DANTLR_BUILD_CPP_TESTS=OFF -S . -B build
          BUILD_COMMAND
          cmake --build build --target install --parallel ${NUM_BUILDING_JOBS}
          INSTALL_COMMAND cmake --install build
-@@ -48,7 +52,7 @@ include_directories(extern/antlr4/fc)
+@@ -48,7 +56,7 @@ include_directories(extern/antlr4/fc)
  file(GLOB ANTLR4_GEN_SRC "extern/antlr4/fc/*.cpp")
  add_library(antlr4-autogen STATIC ${ANTLR4_GEN_SRC})
  add_dependencies(antlr4-autogen antlr4)
