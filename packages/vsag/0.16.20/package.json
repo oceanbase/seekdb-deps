@@ -9,6 +9,7 @@
     "ios-arm64-device-min18",
     "ios-arm64-simulator-min18",
     "wasm32-emscripten",
+    "windows-x86_64-md",
     "windows-x86_64-mt",
     "android-arm64-v8a-api26"
   ],
