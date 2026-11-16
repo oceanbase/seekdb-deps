@@ -170,6 +170,9 @@ jobs:
           (Join-Path $prefix 'bin') >> $env:GITHUB_PATH
           "CC=$compiler" >> $env:GITHUB_ENV
           "CXX=$compiler" >> $env:GITHUB_ENV
+          # The runner's newer MSVC headers need the same compatibility
+          # definition used by seekdb's pinned Clang 18 toolchain.
+          "CXXFLAGS=$env:CXXFLAGS /D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH" >> $env:GITHUB_ENV
 
       - uses: mamba-org/setup-micromamba@v3
         if: ${{ matrix.target.family == 'linux' }}
