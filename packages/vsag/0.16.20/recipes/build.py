@@ -288,6 +288,8 @@ def build(ctx):
             [*WINDOWS_LIBRARIES, "libomp.lib"],
             whole_archives=("vsag_static.lib", "diskann.lib"),
             runtime_files=("bin/libomp.dll",),
+            # Consumers provide Roaring separately; use VSAG's build for this check.
+            external_libraries=(ctx.build_dir / "_deps/roaringbitmap-build/src/roaring.lib",),
         )
     if ctx.target.family == "android":
         ctx.install(

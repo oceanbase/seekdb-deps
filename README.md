@@ -72,7 +72,8 @@ Windows VSAG builds pin Clang 18.1.8 to match the packaged OpenMP runtime and
 define `ANTLR4CPP_STATIC` for the static ANTLR dependency. Before creating either
 VSAG version's archive, the recipe links an executable with all VSAG and DiskANN
 objects against the staged libraries and runs it beside the staged OpenMP DLL.
-The manifest records a successful check as `windows_link_check: passed`.
+Roaring remains a separate consumer dependency; the check uses VSAG's build-tree
+Roaring archive. The manifest records success as `windows_link_check: passed`.
 
 ## Licensing
 
