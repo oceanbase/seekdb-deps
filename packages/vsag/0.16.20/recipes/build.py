@@ -265,6 +265,12 @@ def build(ctx):
         staged_libraries.append(ctx.stage_dir / "lib" / name)
     if ctx.target.family == "wasm":
         nm = Path(ctx.environment["EMSDK"]) / "upstream/bin/llvm-nm"
+        cpuinfo_symbols = subprocess.check_output(
+            [str(nm), "--defined-only", str(ctx.stage_dir / "lib/libcpuinfo.a")],
+            env=ctx.environment, text=True,
+        )
+        if not re.search(r"\b[Tt] cpuinfo_emscripten_init\b", cpuinfo_symbols):
+            raise ValueError("WebAssembly cpuinfo archive lacks cpuinfo_emscripten_init")
         undefined = subprocess.check_output(
             [str(nm), "--undefined-only", *map(str, staged_libraries)],
             env=ctx.environment, text=True,
