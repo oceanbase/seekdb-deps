@@ -90,6 +90,29 @@ class RecipeContext:
         executable = bool(source.stat().st_mode & 0o111)
         output.chmod(0o755 if executable else 0o644)
 
+    def verify_windows_link(self, libraries, *, whole_archives=(), runtime_files=(), external_libraries=()):
+        """Link all selected library objects and start the resulting executable."""
+        directory = self.build_dir / "link-check"
+        directory.mkdir()
+        source = directory / "main.cpp"
+        source.write_text("int main() { return 0; }\n", encoding="ascii")
+        executable = directory / "link-check.exe"
+        arguments = []
+        for library in libraries:
+            path = str(self.stage_dir / "lib" / library)
+            arguments.append("/WHOLEARCHIVE:" + path if library in whole_archives else path)
+        self.run([
+            self.environment["CXX"], "/nologo", "/O2", "/EHsc", "/std:c++17",
+            "/" + self.target.document["abi"]["runtime"], source,
+            "/Fe" + str(executable), "/link", "/INCREMENTAL:NO", "/OPT:NOREF",
+            *arguments, *external_libraries, "advapi32.lib", "user32.lib", "ws2_32.lib",
+        ], cwd=directory)
+        for relative in runtime_files:
+            path = self.stage_dir / relative
+            shutil.copyfile(path, directory / path.name)
+        self.run([executable], cwd=directory)
+        self.observed_build_environment["windows_link_check"] = "passed"
+
 
 def load_target(path):
     document = json.loads(Path(path).read_text(encoding="utf-8"))

@@ -7,7 +7,7 @@ index 34d0678..7aaba82 100644
  )
  
 +if (WIN32)
-+    add_compile_definitions (NOMINMAX _WINDOWS)
++    add_compile_definitions (NOMINMAX _WINDOWS ANTLR4CPP_STATIC)
 +endif ()
 +
 +option (ENABLE_LIBAIO "Build Linux native asynchronous I/O" OFF)
