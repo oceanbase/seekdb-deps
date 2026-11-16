@@ -1,0 +1,31 @@
+packages/vsag/0.16.20/patches/build-adjustments.patch
+  s_99bd9318300c1c::t_062d2da818faf3 10
+packages/vsag/0.18.16/patches/build-adjustments.patch
+  s_99bd9318300c1c::t_062d2da818faf3 10
+packages/vsag/0.16.20/recipes/build.py
+  s_99bd9318300c1c::t_062d2da818faf3 287-291
+.github/workflows/package-deps.yml
+  s_99bd9318300c1c::t_062d2da818faf3 156-170
+README.md
+  s_99bd9318300c1c::t_062d2da818faf3 71-76
+scripts/build.py
+  s_99bd9318300c1c::t_062d2da818faf3 93-115
+packages/vsag/0.18.16/recipes/build.py
+  s_99bd9318300c1c::t_062d2da818faf3 237-241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9a9cedacfd2cb6581c12a5a9672f0e5cdb9e634d",
+  "prompts": {},
+  "sessions": {
+    "s_99bd9318300c1c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c972-d73b-7203-b5c1-870abbb05adf",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangyunlai <5187215+hnwyllmm@users.noreply.github.com>"
+    }
+  }
+}
