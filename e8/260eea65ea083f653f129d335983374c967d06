@@ -1,0 +1,25 @@
+packages/vsag/0.18.16/recipes/build.py
+  s_99bd9318300c1c::t_c2b978e5a183cc 241-242
+packages/vsag/0.16.20/recipes/build.py
+  s_99bd9318300c1c::t_c2b978e5a183cc 291-292
+README.md
+  s_99bd9318300c1c::t_c2b978e5a183cc 75-76
+scripts/build.py
+  s_99bd9318300c1c::t_c2b978e5a183cc 93,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e8260eea65ea083f653f129d335983374c967d06",
+  "prompts": {},
+  "sessions": {
+    "s_99bd9318300c1c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c972-d73b-7203-b5c1-870abbb05adf",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangyunlai <5187215+hnwyllmm@users.noreply.github.com>"
+    }
+  }
+}
