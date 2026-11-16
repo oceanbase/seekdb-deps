@@ -153,7 +153,21 @@ jobs:
         if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
         shell: pwsh
         run: |
-          $compiler = (Get-Command clang-cl.exe -ErrorAction Stop).Source
+          # Match the packaged OpenMP 18.1.8 runtime; newer Clang can emit
+          # OpenMP entry points that this runtime does not export.
+          $installer = Join-Path $env:RUNNER_TEMP 'LLVM-18.1.8-win64.exe'
+          $prefix = Join-Path $env:RUNNER_TEMP 'llvm-18.1.8'
+          Invoke-WebRequest 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile $installer
+          # SHA-256 from Microsoft's LLVM 18.1.8 winget installer manifest.
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '94AF030060D88CC17E9F00EF1663EBDC1126B35E16BEBDFA1E807984B70ABD8F') {
+            throw 'LLVM installer SHA-256 mismatch'
+          }
+          $process = Start-Process $installer -ArgumentList @('/S', "/D=$prefix") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "LLVM installation failed: $($process.ExitCode)" }
+          $compiler = Join-Path $prefix 'bin/clang-cl.exe'
+          & $compiler --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          (Join-Path $prefix 'bin') >> $env:GITHUB_PATH
           "CC=$compiler" >> $env:GITHUB_ENV
           "CXX=$compiler" >> $env:GITHUB_ENV
 

@@ -68,6 +68,12 @@ The jemalloc 5.3.1 recipe uses the official GitHub release archive. It builds th
 
 VSAG 0.16.20 also supports both Windows runtime profiles. Select `windows-x86_64-md` or `windows-x86_64-mt` in the workflow or with `--target` to choose the runtime for either package.
 
+Windows VSAG builds pin Clang 18.1.8 to match the packaged OpenMP runtime and
+define `ANTLR4CPP_STATIC` for the static ANTLR dependency. Before creating either
+VSAG version's archive, the recipe links an executable with all VSAG and DiskANN
+objects against the staged libraries and runs it beside the staged OpenMP DLL.
+The manifest records a successful check as `windows_link_check: passed`.
+
 ## Licensing
 
 Files maintained specifically for this repository are licensed under Apache License 2.0. Third-party dependencies retain their own licenses and notices; each binary package includes the dependency license under `share/licenses/<name>/LICENSE`.

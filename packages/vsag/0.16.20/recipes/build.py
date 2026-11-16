@@ -284,6 +284,11 @@ def build(ctx):
         openmp = _build_windows_openmp(ctx)
         ctx.install(openmp["libomp.lib"], "lib/libomp.lib")
         ctx.install(openmp["libomp.dll"], "bin/libomp.dll")
+        ctx.verify_windows_link(
+            [*WINDOWS_LIBRARIES, "libomp.lib"],
+            whole_archives=("vsag_static.lib", "diskann.lib"),
+            runtime_files=("bin/libomp.dll",),
+        )
     if ctx.target.family == "android":
         ctx.install(
             _built_library(ctx, ("spdlog/install/lib/libspdlog.a",)),

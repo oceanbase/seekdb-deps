@@ -7,7 +7,7 @@ index 8846f0ad..89e4d708 100644
  )
  
 +if (WIN32)
-+    add_compile_definitions (NOMINMAX)
++    add_compile_definitions (NOMINMAX ANTLR4CPP_STATIC)
 +endif ()
 +
  include (cmake/ColorizeMessage.cmake)
