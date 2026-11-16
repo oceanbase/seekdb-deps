@@ -14,6 +14,22 @@
       "system_packages": [
         "libaio-dev"
       ]
+    },
+    "windows": {
+      "llvm": {
+        "version": "18.1.8",
+        "installer_sha256": "94af030060d88cc17e9f00ef1663ebdc1126b35e16bebdfa1e807984b70abd8f"
+      }
+    },
+    "macos": {
+      "llvm": {
+        "homebrew_formulae": ["llvm", "libomp"]
+      }
+    },
+    "ios": {
+      "llvm": {
+        "homebrew_formulae": ["llvm", "libomp"]
+      }
     }
   },
   "source": {

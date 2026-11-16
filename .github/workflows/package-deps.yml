@@ -140,40 +140,6 @@ jobs:
           MSYS2_LOCATION: ${{ steps.jemalloc_msys2.outputs.msys2-location }}
         run: '"MSYS2_LOCATION=$env:MSYS2_LOCATION" >> $env:GITHUB_ENV'
 
-      - name: Select Apple VSAG OpenMP compiler
-        if: ${{ (matrix.target.family == 'macos' || matrix.target.family == 'ios') && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
-        shell: bash
-        run: |
-          brew install llvm libomp
-          llvm_prefix="$(brew --prefix llvm)"
-          echo "CC=$llvm_prefix/bin/clang" >> "$GITHUB_ENV"
-          echo "CXX=$llvm_prefix/bin/clang++" >> "$GITHUB_ENV"
-
-      - name: Select Windows VSAG Clang compiler
-        if: ${{ matrix.target.family == 'windows' && inputs.package == 'vsag' && (inputs.version == '0.18.16' || inputs.version == '0.16.20') }}
-        shell: pwsh
-        run: |
-          # Match the packaged OpenMP 18.1.8 runtime; newer Clang can emit
-          # OpenMP entry points that this runtime does not export.
-          $installer = Join-Path $env:RUNNER_TEMP 'LLVM-18.1.8-win64.exe'
-          $prefix = Join-Path $env:RUNNER_TEMP 'llvm-18.1.8'
-          Invoke-WebRequest 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile $installer
-          # SHA-256 from Microsoft's LLVM 18.1.8 winget installer manifest.
-          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '94AF030060D88CC17E9F00EF1663EBDC1126B35E16BEBDFA1E807984B70ABD8F') {
-            throw 'LLVM installer SHA-256 mismatch'
-          }
-          $process = Start-Process $installer -ArgumentList @('/S', "/D=$prefix") -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "LLVM installation failed: $($process.ExitCode)" }
-          $compiler = Join-Path $prefix 'bin/clang-cl.exe'
-          & $compiler --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          (Join-Path $prefix 'bin') >> $env:GITHUB_PATH
-          "CC=$compiler" >> $env:GITHUB_ENV
-          "CXX=$compiler" >> $env:GITHUB_ENV
-          # The runner's newer MSVC headers need the same compatibility
-          # definition used by seekdb's pinned Clang 18 toolchain.
-          "CXXFLAGS=$env:CXXFLAGS /D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH" >> $env:GITHUB_ENV
-
       - uses: mamba-org/setup-micromamba@v3
         if: ${{ matrix.target.family == 'linux' }}
         with:

@@ -457,7 +457,9 @@ def main():
     profile = target_profile(target) if target else None
     if target and target not in metadata.get("supported_targets", [target]):
         raise ValueError("Package {} does not support target {}".format(args.name, target))
-    build_environment = initialize_build_environment(profile) if profile else None
+    build_environment = initialize_build_environment(
+        profile, metadata.get("build_dependencies", {}).get(profile["family"], {})
+    ) if profile else None
     repo_sha, repo_checkout = repository_commit()
     output_dir = Path(args.output).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
