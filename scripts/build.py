@@ -104,7 +104,7 @@ class RecipeContext:
         self.run([
             self.environment["CXX"], "/nologo", "/O2", "/EHsc", "/std:c++17",
             "/" + self.target.document["abi"]["runtime"], source,
-            "/Fe" + str(executable), "/link", "/INCREMENTAL:NO",
+            "/Fe" + str(executable), "/link", "/INCREMENTAL:NO", "/OPT:NOREF",
             *arguments, "advapi32.lib", "user32.lib", "ws2_32.lib",
         ], cwd=directory)
         for relative in runtime_files:
