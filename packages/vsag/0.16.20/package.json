@@ -15,8 +15,12 @@
   ],
   "build_dependencies": {
     "linux": {
-      "compilers": ["fortran"],
-      "system_packages": ["libaio-dev"]
+      "compilers": [
+        "fortran"
+      ],
+      "system_packages": [
+        "libaio-dev"
+      ]
     },
     "windows": {
       "llvm": {
@@ -26,12 +30,18 @@
     },
     "macos": {
       "llvm": {
-        "homebrew_formulae": ["llvm", "libomp"]
+        "homebrew_formulae": [
+          "llvm",
+          "libomp"
+        ]
       }
     },
     "ios": {
       "llvm": {
-        "homebrew_formulae": ["llvm", "libomp"]
+        "homebrew_formulae": [
+          "llvm",
+          "libomp"
+        ]
       }
     }
   },
@@ -45,7 +55,13 @@
     "strip_prefix": "vsag-0.16.20"
   },
   "recipe": "recipes/build.py",
-  "patches": ["patches/build-adjustments.patch", "patches/apple-cross.patch", "patches/wasm-cross.patch", "patches/diskann-signatures.patch"],
+  "patches": [
+    "patches/build-adjustments.patch",
+    "patches/apple-cross.patch",
+    "patches/wasm-cross.patch",
+    "patches/wasm-openblas-signatures.patch",
+    "patches/diskann-signatures.patch"
+  ],
   "license": {
     "spdx_id": "Apache-2.0",
     "source_path": "LICENSE"

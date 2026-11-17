@@ -241,3 +241,14 @@ index 0b0b9c7..af30394 100644
  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops")
  else ()
  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /openmp")
+diff --git a/extern/cpuinfo/cpuinfo.cmake b/extern/cpuinfo/cpuinfo.cmake
+--- a/extern/cpuinfo/cpuinfo.cmake
++++ b/extern/cpuinfo/cpuinfo.cmake
+@@ -24,3 +24,7 @@ if(NOT cpuinfo_POPULATED)
+   FetchContent_Populate(cpuinfo)
+   add_subdirectory(${cpuinfo_SOURCE_DIR} ${cpuinfo_BINARY_DIR} EXCLUDE_FROM_ALL)
++if(EMSCRIPTEN)
++  # cpuinfo's platform check excludes wasm32, but its init.c calls this implementation.
++  target_sources(cpuinfo PRIVATE ${cpuinfo_SOURCE_DIR}/src/emscripten/init.c)
++endif()
+ endif()
