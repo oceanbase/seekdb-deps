@@ -1,0 +1,50 @@
+--- a/src/algorithm/hnswlib/hnswalg.cpp
++++ b/src/algorithm/hnswlib/hnswalg.cpp
+@@ -704,6 +704,7 @@
+
+     std::priority_queue<std::pair<float, InnerIdType>> queue_closest;
+     vsag::Vector<std::pair<float, InnerIdType>> return_list(allocator_);
++    vsag::Vector<std::pair<float, InnerIdType>> duplicate_candidates(allocator_);
+     while (not top_candidates.empty()) {
+         queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
+         top_candidates.pop();
+@@ -716,19 +717,35 @@
+         float float_query = -current_pair.first;
+         queue_closest.pop();
+         bool good = true;
++        bool duplicate = false;
++        const auto* current_data = getDataByInternalId(current_pair.second);
+
+         for (std::pair<float, InnerIdType> second_pair : return_list) {
+-            float curdist = fstdistfunc_(getDataByInternalId(second_pair.second),
+-                                         getDataByInternalId(current_pair.second),
+-                                         dist_func_param_);
++            const auto* selected_data = getDataByInternalId(second_pair.second);
++            float curdist = fstdistfunc_(selected_data, current_data, dist_func_param_);
+             if (curdist < float_query) {
+                 good = false;
+                 break;
+             }
++            duplicate |= curdist == 0.0f &&
++                         std::memcmp(selected_data, current_data, data_size_) == 0;
+         }
+         if (good) {
+-            return_list.emplace_back(current_pair);
++            if (duplicate) {
++                duplicate_candidates.emplace_back(current_pair);
++            } else {
++                return_list.emplace_back(current_pair);
++            }
++        }
++    }
++
++    // Keep separate labels for identical vectors, but leave room for links
++    // to other locations before spending the remaining degree on duplicates.
++    for (const auto& candidate : duplicate_candidates) {
++        if (return_list.size() == M) {
++            break;
+         }
++        return_list.emplace_back(candidate);
+     }
+
+     for (std::pair<float, InnerIdType> current_pair : return_list) {

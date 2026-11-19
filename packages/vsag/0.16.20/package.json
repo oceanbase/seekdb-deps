@@ -60,7 +60,8 @@
     "patches/apple-cross.patch",
     "patches/wasm-cross.patch",
     "patches/wasm-openblas-signatures.patch",
-    "patches/diskann-signatures.patch"
+    "patches/diskann-signatures.patch",
+    "patches/hnsw-diversify-zero-distance-neighbors.patch"
   ],
   "license": {
     "spdx_id": "Apache-2.0",
