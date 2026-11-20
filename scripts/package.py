@@ -85,6 +85,22 @@ def package_paths(name, version):
         raise ValueError("Package source revision must be a Git object id")
     if not re.match(r"^[0-9a-fA-F]{64}$", source["archive_sha256"]):
         raise ValueError("Package source archive_sha256 must be a SHA256 digest")
+    if not isinstance(source.get("extra_archives", []), list):
+        raise ValueError("Package extra_archives must be a list")
+    for extra in source.get("extra_archives", []):
+        if not isinstance(extra, dict):
+            raise ValueError("Extra source archive must be an object")
+        for field in ("path", "url", "archive_sha256", "strip_prefix"):
+            if field not in extra:
+                raise ValueError("Extra source archive is missing field: " + field)
+        extra_path = safe_relative(extra["path"], "extra source path")
+        if len(extra_path.parts) != 1:
+            raise ValueError("Extra source path must be a top-level directory")
+        safe_relative(extra["strip_prefix"], "extra source strip_prefix")
+        if not extra["url"].startswith("https://"):
+            raise ValueError("Extra source archive URL must use HTTPS")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", extra["archive_sha256"]):
+            raise ValueError("Extra source archive SHA256 must be a SHA256 digest")
     for field in ("spdx_id", "source_path"):
         if field not in metadata["license"]:
             raise ValueError("Package license metadata is missing field: " + field)
@@ -122,8 +138,8 @@ def repository_commit():
     return run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture=True), True
 
 
-def download_source_archive(source, workspace):
-    archive_path = workspace / "upstream-source.tar.gz"
+def download_source_archive(source, workspace, filename="upstream-source.tar.gz"):
+    archive_path = workspace / filename
     request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
     with urlopen(request, timeout=120) as response:
         if not response.geturl().startswith("https://"):
@@ -231,28 +247,44 @@ def source_revision(package_root, metadata, repo_checkout, workspace):
         document = verify_manifest(ROOT, expected_type="source")
         upstream = document.get("upstream", {})
         if (upstream.get("revision") != source["revision"]
-                or upstream.get("archive_sha256") != source["archive_sha256"]):
+                or upstream.get("archive_sha256") != source["archive_sha256"]
+                or upstream.get("extra_archives", []) != source.get("extra_archives", [])):
             raise ValueError("Source bundle and package metadata upstream pins do not match")
         if not source_dir.is_dir():
             raise ValueError("Pinned upstream source is missing: " + str(source_dir))
+        for extra in source.get("extra_archives", []):
+            if not (source_dir / safe_relative(extra["path"], "extra source path")).is_dir():
+                raise ValueError("Pinned extra source is missing: " + extra["path"])
         return source["revision"], source_dir
 
     workspace.mkdir(parents=True, exist_ok=True)
     archive_path = download_source_archive(source, workspace)
     source_dir = workspace / "source"
     extract_source_archive(archive_path, source_dir, source["strip_prefix"])
+    for index, extra in enumerate(source.get("extra_archives", [])):
+        relative = safe_relative(extra["path"], "extra source path")
+        destination = source_dir / relative
+        if destination.exists() or destination.is_symlink():
+            raise ValueError("Extra source path overlaps another source: " + extra["path"])
+        extra_archive = download_source_archive(
+            extra, workspace, "extra-source-{}.tar.gz".format(index)
+        )
+        extract_source_archive(extra_archive, destination, extra["strip_prefix"])
     return source["revision"], source_dir
 
 
 def upstream_record(metadata, source_revision_sha):
     source = metadata["source"]
-    return {
+    record = {
         "repository": source["repository"],
         "url": source["url"],
         "tag": source["tag"],
         "revision": source_revision_sha,
         "archive_sha256": source["archive_sha256"],
     }
+    if source.get("extra_archives"):
+        record["extra_archives"] = source["extra_archives"]
+    return record
 
 
 def patch_records(package_root, metadata):
