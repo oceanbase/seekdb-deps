@@ -1,0 +1,49 @@
+name: Publish Windows Rust CI image
+
+on:
+  workflow_dispatch:
+    inputs:
+      rust_version:
+        description: Exact Rust version from seekdb/rust-toolchain.toml
+        type: string
+        required: true
+        default: '1.100.0'
+
+jobs:
+  publish:
+    if: ${{ github.repository == 'oceanbase/seekdb-deps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/oceanbase/seekdb-rust-windows-gnu
+      RUST_VERSION: ${{ inputs.rust_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build and publish image
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ ! "$RUST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo '::error::rust_version must be an exact version, such as 1.100.0.'
+            exit 1
+          fi
+
+          printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+          tag="rust-${RUST_VERSION}-${GITHUB_SHA}"
+          metadata="$RUNNER_TEMP/rust-windows-gnu-image.json"
+          docker buildx build --platform linux/amd64 \
+            --build-arg "RUST_VERSION=$RUST_VERSION" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$IMAGE:$tag" --metadata-file "$metadata" \
+            --push images/rust-windows-gnu
+
+          digest=$(jq -er '.["containerimage.digest"]' "$metadata")
+          printf 'Tag `%s:%s`\n\nPin in CI `%s@%s`\n' "$IMAGE" "$tag" "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
