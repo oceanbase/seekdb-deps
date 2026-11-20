@@ -19,14 +19,16 @@ def build(ctx):
     family = ctx.target.family
     target = TARGETS[(family, ctx.target.architecture)]
     environment = {}
-    options = ["no-shared", "no-tests"]
+    # Embed the default, base, and legacy providers in libcrypto so consumers
+    # do not need a separately installed OpenSSL modules directory.
+    options = ["no-shared", "no-tests", "no-apps", "no-module", "no-pinshared"]
 
     if family == "windows":
         if ctx.target.document["abi"]["runtime"] != "MT":
             raise ValueError("Windows OpenSSL must use the static MSVC runtime (/MT)")
         if re.search(r"/MDd?\b|/MTd\b", ctx.environment.get("CFLAGS", ""), re.I):
             raise ValueError("CFLAGS conflicts with the Windows /MT target")
-        # OpenSSL 1.1.1 uses /MT for its static libraries when no-shared is set.
+        # OpenSSL 3.5 uses /MT for its static libraries when no-shared is set.
         # CreateProcess searches the parent process PATH, not the environment
         # passed to the child; VS tools are on the initialized child PATH.
         build_tool = shutil.which("nmake", path=ctx.environment["PATH"])
