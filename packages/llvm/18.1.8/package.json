@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "name": "llvm",
+  "version": "18.1.8",
+  "supported_targets": [
+    "windows-x86_64-mt"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/llvm/llvm-project/tar.gz/refs/tags/llvmorg-18.1.8",
+    "repository": "https://github.com/llvm/llvm-project.git",
+    "tag": "llvmorg-18.1.8",
+    "revision": "3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff",
+    "archive_sha256": "09c08693a9afd6236f27a2ebae62cda656eba19021ef3f94d59e931d662d4856",
+    "strip_prefix": "llvm-project-llvmorg-18.1.8"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Apache-2.0 WITH LLVM-exception",
+    "source_path": "LICENSE.TXT"
+  },
+  "required_artifacts": {
+    "windows": [
+      "bin/clang-cl.exe",
+      "bin/lld-link.exe",
+      "bin/llvm-lib.exe",
+      "bin/llvm-rc.exe",
+      "lib/clang/18/include/stddef.h"
+    ]
+  }
+}
