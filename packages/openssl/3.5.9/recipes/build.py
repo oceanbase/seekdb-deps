@@ -3,13 +3,16 @@
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
+import subprocess
 
 
 TARGETS = {
     ("linux", "x86_64"): "linux-x86_64",
     ("linux", "arm64"): "linux-aarch64",
     ("macos", "arm64"): "darwin64-arm64-cc",
+    ("wasm", "wasm32"): "linux-generic32",
     ("windows", "x86_64"): "VC-WIN64A",
     ("android", "arm64-v8a"): "android-arm64",
 }
@@ -17,7 +20,11 @@ TARGETS = {
 
 def build(ctx):
     family = ctx.target.family
-    target = TARGETS[(family, ctx.target.architecture)]
+    if family == "ios":
+        sdk = ctx.target.document["abi"]["sdk"]
+        target = "iossimulator-arm64-xcrun" if sdk == "iphonesimulator" else "ios64-xcrun"
+    else:
+        target = TARGETS[(family, ctx.target.architecture)]
     environment = {}
     # Embed the default, base, and legacy providers in libcrypto so consumers
     # do not need a separately installed OpenSSL modules directory.
@@ -45,6 +52,30 @@ def build(ctx):
             minimum = ctx.target.document["abi"]["minimum_os_version"]
             environment["MACOSX_DEPLOYMENT_TARGET"] = minimum
             options.append("-mmacosx-version-min=" + minimum)
+        elif family == "ios":
+            minimum = ctx.target.document["abi"]["minimum_os_version"]
+            sdk_path = subprocess.check_output(
+                ["xcrun", "--sdk", sdk, "--show-sdk-path"],
+                env=ctx.environment, text=True,
+            ).strip()
+            triple = "arm64-apple-ios" + minimum
+            if sdk == "iphonesimulator":
+                triple += "-simulator"
+            minimum_flag = ("-mios-simulator-version-min=" if sdk == "iphonesimulator"
+                            else "-miphoneos-version-min=")
+            environment["CFLAGS"] = " ".join([
+                ctx.environment.get("CFLAGS", ""), "-O2", "-target", triple,
+                "-isysroot", shlex.quote(sdk_path), minimum_flag + minimum,
+            ]).strip()
+        elif family == "wasm":
+            environment.update({"AR": "emar", "RANLIB": "emranlib"})
+            environment["CFLAGS"] = " ".join([
+                ctx.environment.get("CFLAGS", ""), "-pthread", "-msimd128",
+            ]).strip()
+            options.extend([
+                "no-asm", "no-dso", "no-engine", "no-async", "no-sock",
+                "no-afalgeng", "no-ui-console", "-pthread",
+            ])
         elif family == "android":
             ndk = Path(ctx.environment["ANDROID_NDK_HOME"])
             bin_dir = ndk / "toolchains/llvm/prebuilt/linux-x86_64/bin"
