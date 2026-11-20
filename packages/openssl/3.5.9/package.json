@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "name": "openssl",
+  "version": "3.5.9",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "ios-arm64-device-min18",
+    "ios-arm64-simulator-min18",
+    "wasm32-emscripten",
+    "windows-x86_64-mt",
+    "android-arm64-v8a-api26"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+    "repository": "https://github.com/openssl/openssl.git",
+    "tag": "openssl-3.5.9",
+    "revision": "45e844fa2a14ec92d146bd8f5778ac130b6625fb",
+    "archive_sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a",
+    "strip_prefix": "openssl-3.5.9"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE.txt"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/openssl/crypto.h",
+      "include/openssl/configuration.h",
+      "include/openssl/opensslconf.h",
+      "include/openssl/ssl.h",
+      "lib/libcrypto.a",
+      "lib/libssl.a",
+      "share/licenses/openssl/LICENSE"
+    ],
+    "windows": [
+      "include/openssl/crypto.h",
+      "include/openssl/configuration.h",
+      "include/openssl/opensslconf.h",
+      "include/openssl/ssl.h",
+      "lib/libcrypto.lib",
+      "lib/libssl.lib",
+      "share/licenses/openssl/LICENSE"
+    ]
+  }
+}

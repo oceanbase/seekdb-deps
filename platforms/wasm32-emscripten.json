@@ -1,0 +1,7 @@
+{
+  "id": "wasm32-emscripten",
+  "family": "wasm",
+  "architecture": "wasm32",
+  "hosts": [{"os": "linux", "architectures": ["x86_64"]}],
+  "abi": {"emscripten_version": "6.0.12", "features": ["pthread", "exceptions", "simd128", "wasmfs"]}
+}

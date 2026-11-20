@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prepare and validate the host compiler environment for a target profile."""
 
+import hashlib
 import os
 from pathlib import Path
 import platform
@@ -9,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from urllib.request import Request, urlopen
 
 
 MINIMUM_CMAKE_VERSION = (3, 22, 1)
@@ -157,6 +159,75 @@ def _windows_developer_environment(env):
     return initialized
 
 
+def _windows_llvm_environment(env, dependency):
+    version = dependency.get("version", "")
+    digest = dependency.get("installer_sha256", "")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version) or not re.fullmatch(r"[0-9a-fA-F]{64}", digest):
+        raise ValueError("Windows LLVM build dependency needs a version and installer SHA256")
+
+    compiler = env.get("CC") or env.get("CXX")
+    if compiler:
+        env.setdefault("CC", compiler)
+        env.setdefault("CXX", compiler)
+    else:
+        cache = Path(env.get("RUNNER_TEMP") or env.get("LOCALAPPDATA") or tempfile.gettempdir())
+        cache = cache / "seekdb-deps" / "tools"
+        prefix = cache / ("llvm-{}-{}".format(version, digest[:12].lower()))
+        compiler = prefix / "bin" / "clang-cl.exe"
+        if not compiler.is_file():
+            cache.mkdir(parents=True, exist_ok=True)
+            url = ("https://github.com/llvm/llvm-project/releases/download/llvmorg-{0}/"
+                   "LLVM-{0}-win64.exe").format(version)
+            with tempfile.NamedTemporaryFile(suffix=".exe", dir=cache, delete=False) as temporary:
+                installer = Path(temporary.name)
+            try:
+                checksum = hashlib.sha256()
+                with urlopen(Request(url, headers={"User-Agent": "seekdb-deps"}), timeout=120) as response:
+                    if not response.geturl().startswith("https://"):
+                        raise ValueError("Windows LLVM installer download did not remain on HTTPS")
+                    with installer.open("wb") as output:
+                        for chunk in iter(lambda: response.read(1024 * 1024), b""):
+                            checksum.update(chunk)
+                            output.write(chunk)
+                if checksum.hexdigest().lower() != digest.lower():
+                    raise ValueError("Windows LLVM installer SHA256 mismatch")
+                _run([str(installer), "/S", "/D=" + str(prefix)], env=env)
+            finally:
+                installer.unlink(missing_ok=True)
+            if not compiler.is_file():
+                raise ValueError("Windows LLVM installer did not provide " + str(compiler))
+        env["CC"] = str(compiler)
+        env["CXX"] = str(compiler)
+
+    for name in ("CC", "CXX"):
+        path = _require_command(env[name], env)
+        output = _run([path, "--version"], env=env, capture=True)
+        if Path(path).name.lower() != "clang-cl.exe" or _version_tuple(output)[:3] != _version_tuple(version):
+            raise ValueError("Windows LLVM build dependency requires clang-cl " + version + "; found " + output.splitlines()[0])
+    compiler_dir = str(Path(_require_command(env["CC"], env)).parent)
+    env["PATH"] = compiler_dir + os.pathsep + env.get("PATH", "")
+    compatibility_flag = "/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    if compatibility_flag not in env.get("CXXFLAGS", ""):
+        env["CXXFLAGS"] = _join_flags(env.get("CXXFLAGS", ""), compatibility_flag)
+    return env
+
+
+def _apple_llvm_environment(env, dependency):
+    formulae = dependency.get("homebrew_formulae", [])
+    if not formulae or not all(isinstance(name, str) and name for name in formulae):
+        raise ValueError("Apple LLVM build dependency needs Homebrew formulae")
+    brew = _require_command("brew", env)
+    _run([brew, "install", *formulae], env=env)
+    prefix = _run([brew, "--prefix", "llvm"], env=env, capture=True).strip()
+    if not prefix:
+        raise ValueError("Homebrew did not provide an LLVM installation")
+    compiler_dir = Path(prefix) / "bin"
+    env.setdefault("CC", str(compiler_dir / "clang"))
+    env.setdefault("CXX", str(compiler_dir / "clang++"))
+    env["PATH"] = str(compiler_dir) + os.pathsep + env.get("PATH", "")
+    return env
+
+
 def _android_ndk(env):
     ndk_value = env.get("ANDROID_NDK_HOME") or env.get("ANDROID_NDK_ROOT")
     if not ndk_value:
@@ -203,7 +274,7 @@ def _android_ndk(env):
     }
 
 
-def initialize_build_environment(profile):
+def initialize_build_environment(profile, build_dependencies=None):
     """Return the prepared child-process environment and target CMake settings."""
     host = detect_host()
     allowed_hosts = profile["hosts"]
@@ -214,14 +285,22 @@ def initialize_build_environment(profile):
                 profile["id"], host["os"], host["architecture"]
             )
         )
-    if profile["family"] != "android" and profile["family"] != host["os"]:
-        raise ValueError("Only Android targets support cross-platform build hosts")
-    if profile["family"] != "android" and host["architecture"] != profile["architecture"]:
+    cross_family = profile["family"] in ("android", "ios", "wasm")
+    if not cross_family and profile["family"] != host["os"]:
+        raise ValueError("Target family does not match the build host")
+    if not cross_family and host["architecture"] != profile["architecture"]:
         raise ValueError("This profile supports native builds only")
 
     env = dict(os.environ)
     if profile["family"] == "windows":
         env = _windows_developer_environment(env)
+        llvm = (build_dependencies or {}).get("llvm")
+        if llvm:
+            env = _windows_llvm_environment(env, llvm)
+    elif profile["family"] in ("macos", "ios"):
+        llvm = (build_dependencies or {}).get("llvm")
+        if llvm:
+            env = _apple_llvm_environment(env, llvm)
     _require_build_tools(env)
 
     args = ["-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
@@ -307,6 +386,57 @@ def initialize_build_environment(profile):
                          "deployment_target": abi["minimum_os_version"],
                          "cflags": cflags, "cxxflags": cxxflags,
                          "ldflags": env.get("LDFLAGS", "")})
+    elif family == "ios":
+        sdk = abi["sdk"]
+        if sdk not in ("iphoneos", "iphonesimulator"):
+            raise ValueError("Unsupported iOS SDK: " + str(sdk))
+        env.setdefault("CC", "clang")
+        env.setdefault("CXX", "clang++")
+        c_compiler, _ = _compiler_info(env["CC"], env)
+        cxx_compiler, _ = _compiler_info(env["CXX"], env)
+        sdk_path = _run(["xcrun", "--sdk", sdk, "--show-sdk-path"], env=env, capture=True).strip()
+        sdk_version = _run(["xcrun", "--sdk", sdk, "--show-sdk-version"], env=env, capture=True).strip()
+        minimum = abi["minimum_os_version"]
+        triple = "arm64-apple-ios" + minimum + ("-simulator" if sdk == "iphonesimulator" else "")
+        args.extend([
+            "-DCMAKE_SYSTEM_NAME=iOS",
+            "-DCMAKE_SYSTEM_VERSION=" + minimum,
+            "-DCMAKE_C_COMPILER=" + c_compiler["path"],
+            "-DCMAKE_CXX_COMPILER=" + cxx_compiler["path"],
+            "-DCMAKE_C_COMPILER_TARGET=" + triple,
+            "-DCMAKE_CXX_COMPILER_TARGET=" + triple,
+            "-DCMAKE_OSX_ARCHITECTURES=arm64",
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + minimum,
+            "-DCMAKE_OSX_SYSROOT=" + sdk_path,
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+        ])
+        observed.update({"c_compiler": c_compiler, "cxx_compiler": cxx_compiler,
+                         "sdk": sdk, "sdk_version": sdk_version,
+                         "deployment_target": minimum, "target_triple": triple})
+    elif family == "wasm":
+        emsdk = Path(env.get("EMSDK", "")).resolve()
+        toolchain = emsdk / "upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+        if not toolchain.is_file():
+            raise ValueError("Set EMSDK to an activated Emscripten SDK")
+        compiler = _require_command("emcc", env)
+        version_text = _run([compiler, "--version"], env=env, capture=True)
+        version = abi["emscripten_version"]
+        if not re.search(r"\b" + re.escape(version) + r"\b", version_text):
+            raise ValueError("WASM target requires Emscripten {}; found {}".format(
+                version, version_text.splitlines()[0]
+            ))
+        env["CC"] = compiler
+        env["CXX"] = _require_command("em++", env)
+        args.extend([
+            "-DCMAKE_TOOLCHAIN_FILE=" + str(toolchain),
+            "-DCMAKE_C_COMPILER=" + env["CC"],
+            "-DCMAKE_CXX_COMPILER=" + env["CXX"],
+            "-DCMAKE_C_FLAGS=-pthread -msimd128",
+            "-DCMAKE_CXX_FLAGS=-pthread -fexceptions -msimd128",
+            "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+        ])
+        observed.update({"emscripten_version": version, "emsdk": str(emsdk),
+                         "features": abi["features"]})
     elif family == "windows":
         toolset = env.get("VCToolsVersion", "")
         version = _version_tuple(toolset) if toolset else ()

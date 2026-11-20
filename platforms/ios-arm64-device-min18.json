@@ -1,0 +1,7 @@
+{
+  "id": "ios-arm64-device-min18",
+  "family": "ios",
+  "architecture": "arm64",
+  "hosts": [{"os": "macos", "architectures": ["x86_64", "arm64"]}],
+  "abi": {"sdk": "iphoneos", "minimum_os_version": "18.0"}
+}
