@@ -126,6 +126,17 @@ jobs:
         if: ${{ matrix.target.family != 'linux' }}
         run: python -m pip install --disable-pip-version-check cmake ninja
 
+      - name: Prepare Windows NASM build tool
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        run: |
+          choco install nasm --yes --no-progress
+          $nasmDir = Join-Path $env:ProgramFiles 'NASM'
+          if (-not (Test-Path (Join-Path $nasmDir 'nasm.exe'))) {
+            throw "NASM was not installed at $nasmDir"
+          }
+          $nasmDir >> $env:GITHUB_PATH
+
       - uses: msys2/setup-msys2@v2
         id: jemalloc_msys2
         if: ${{ matrix.target.family == 'windows' && inputs.package == 'jemalloc' && inputs.version == '5.3.1' }}
