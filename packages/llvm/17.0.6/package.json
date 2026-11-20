@@ -4,7 +4,8 @@
   "version": "17.0.6",
   "supported_targets": [
     "linux-x86_64-glibc217",
-    "linux-aarch64-glibc217"
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13"
   ],
   "build_dependencies": {
     "linux": {
@@ -27,7 +28,7 @@
     "source_path": "LICENSE.TXT"
   },
   "required_artifacts": {
-    "default": [
+    "linux": [
       "bin/clang",
       "bin/clang++",
       "bin/lld",
@@ -42,6 +43,16 @@
       "bin/llvm-ranlib",
       "bin/llvm-strip",
       "lib/libLLVM-17.so",
+      "lib/clang/17/include/stddef.h"
+    ],
+    "macos": [
+      "bin/clang",
+      "bin/clang++",
+      "bin/lld",
+      "bin/ld.lld",
+      "bin/llvm-ar",
+      "bin/llvm-objcopy",
+      "lib/libLLVM.dylib",
       "lib/clang/17/include/stddef.h"
     ]
   }

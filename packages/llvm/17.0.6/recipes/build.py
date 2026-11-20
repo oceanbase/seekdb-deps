@@ -17,8 +17,8 @@ ALIASES = {
 
 
 def build(ctx):
-    if ctx.target.family != "linux":
-        raise ValueError("LLVM toolchain package is only used by Linux seekdb builds")
+    if ctx.target.family not in ("linux", "macos"):
+        raise ValueError("LLVM toolchain package is used only by Linux and macOS builds")
     llvm_target = {"x86_64": "X86", "arm64": "AArch64"}.get(ctx.target.architecture)
     if llvm_target is None:
         raise ValueError("Unsupported LLVM host architecture: " + ctx.target.architecture)
@@ -26,9 +26,8 @@ def build(ctx):
     options = {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
-        "CMAKE_INSTALL_RPATH": "$ORIGIN/../lib",
-        "CMAKE_EXE_LINKER_FLAGS": "-static-libstdc++ -static-libgcc",
-        "CMAKE_SHARED_LINKER_FLAGS": "-static-libstdc++ -static-libgcc",
+        "CMAKE_INSTALL_RPATH": ("$ORIGIN/../lib" if ctx.target.family == "linux"
+                                else "@loader_path/../lib"),
         "LLVM_TARGETS_TO_BUILD": llvm_target,
         "LLVM_ENABLE_PROJECTS": "clang;lld",
         "LLVM_BUILD_LLVM_DYLIB": "ON",
@@ -50,6 +49,11 @@ def build(ctx):
         "CLANG_ENABLE_STATIC_ANALYZER": "OFF",
         "CLANG_ENABLE_ARCMT": "OFF",
     }
+    if ctx.target.family == "linux":
+        options["CMAKE_EXE_LINKER_FLAGS"] = "-static-libstdc++ -static-libgcc"
+        options["CMAKE_SHARED_LINKER_FLAGS"] = "-static-libstdc++ -static-libgcc"
+    else:
+        options["CMAKE_MACOSX_RPATH"] = "ON"
     configure = [
         "cmake", "-S", str(ctx.source_dir / "llvm"),
         "-B", str(ctx.build_dir), "-G", "Ninja",
@@ -73,26 +77,31 @@ def build(ctx):
     built_library = ctx.build_dir / "lib"
     target_library = target_prefix / "lib"
     target_library.mkdir(parents=True)
-    for source in built_library.glob("libLLVM*.so*"):
+    library_pattern = "libLLVM*.so*" if ctx.target.family == "linux" else "libLLVM*.dylib"
+    for source in built_library.glob(library_pattern):
         destination = target_library / source.name
         if source.is_symlink():
             destination.symlink_to(source.readlink())
         elif source.is_file():
             shutil.copy2(source, destination)
-    if not (target_library / "libLLVM-17.so").exists():
-        raise ValueError("Required LLVM shared library is missing: libLLVM-17.so")
+    required_library = "libLLVM-17.so" if ctx.target.family == "linux" else "libLLVM.dylib"
+    if not (target_library / required_library).exists():
+        raise ValueError("Required LLVM shared library is missing: " + required_library)
 
-    strip_tool = subprocess.check_output(
-        [ctx.environment["CC"], "-print-prog-name=strip"],
-        env=ctx.environment, text=True,
-    ).strip()
-    for binary in (target_bin / name for name in TOOLS):
-        ctx.run([strip_tool, "--strip-unneeded", str(binary)])
-        ctx.run(["patchelf", "--set-rpath", "$ORIGIN/../lib", str(binary)])
-    for library in target_library.iterdir():
-        if library.is_file() and not library.is_symlink():
-            ctx.run([strip_tool, "--strip-unneeded", str(library)])
-            ctx.run(["patchelf", "--set-rpath", "$ORIGIN", str(library)])
+    if ctx.target.family == "linux":
+        strip_tool = subprocess.check_output(
+            [ctx.environment["CC"], "-print-prog-name=strip"],
+            env=ctx.environment, text=True,
+        ).strip()
+        for binary in (target_bin / name for name in TOOLS):
+            ctx.run([strip_tool, "--strip-unneeded", str(binary)])
+            ctx.run(["patchelf", "--set-rpath", "$ORIGIN/../lib", str(binary)])
+        for library in target_library.iterdir():
+            if library.is_file() and not library.is_symlink():
+                ctx.run([strip_tool, "--strip-unneeded", str(library)])
+                ctx.run(["patchelf", "--set-rpath", "$ORIGIN", str(library)])
+    else:
+        ctx.run([str(target_bin / "clang"), "--version"])
 
     resource_headers = built_library / "clang" / "17" / "include"
     if not (resource_headers / "stddef.h").is_file():
