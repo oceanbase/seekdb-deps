@@ -6,6 +6,11 @@
     "linux-x86_64-glibc217",
     "linux-aarch64-glibc217"
   ],
+  "build_dependencies": {
+    "linux": {
+      "system_packages": ["patchelf"]
+    }
+  },
   "source": {
     "path": "source",
     "url": "https://codeload.github.com/llvm/llvm-project/tar.gz/refs/tags/llvmorg-17.0.6",
