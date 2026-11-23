@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "libcurl",
+  "version": "8.12.1",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://github.com/curl/curl/releases/download/curl-8_12_1/curl-8.12.1.tar.gz",
+    "repository": "https://github.com/curl/curl.git",
+    "tag": "curl-8_12_1",
+    "revision": "57495c64871d18905a0941db9196ef90bafe9a29",
+    "archive_sha256": "7b40ea64947e0b440716a4d7f0b7aa56230a5341c8377d7b609649d4aea8dbcf",
+    "strip_prefix": "curl-8.12.1",
+    "extra_archives": [
+      {
+        "path": "openssl-linux-x86_64-glibc217",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-linux-x86_64-glibc217-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "dc2b745ce912ccff3359c1beb3418111acfcd19d696d4cf269b5965e7cd43d6e",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-linux-aarch64-glibc217",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-linux-aarch64-glibc217-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "4ed1c5b31af2ac66b0fae861f7520e840297b58845b2d7e500b52d948bbdc9ed",
+        "strip_prefix": "openssl-3.5.9"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "curl",
+    "source_path": "COPYING"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/curl/curl.h",
+      "include/curl/curlver.h",
+      "lib/libcurl.a"
+    ]
+  }
+}
