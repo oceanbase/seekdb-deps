@@ -10,7 +10,6 @@ TOOLS = (
 )
 ALIASES = {
     "clang++": "clang",
-    "ld.lld": "lld",
     "llvm-ranlib": "llvm-ar",
     "llvm-strip": "llvm-objcopy",
 }
@@ -73,6 +72,8 @@ def build(ctx):
         shutil.copy2(source, target_bin / tool)
     for name, target in ALIASES.items():
         (target_bin / name).symlink_to(target)
+    linker = "ld.lld" if ctx.target.family == "linux" else "ld64.lld"
+    (target_bin / linker).symlink_to("lld")
 
     built_library = ctx.build_dir / "lib"
     target_library = target_prefix / "lib"
@@ -101,7 +102,13 @@ def build(ctx):
                 ctx.run([strip_tool, "--strip-unneeded", str(library)])
                 ctx.run(["patchelf", "--set-rpath", "$ORIGIN", str(library)])
     else:
-        ctx.run([str(target_bin / "clang"), "--version"])
+        source = ctx.build_dir / "link-check.c"
+        source.write_text("int main(void) { return 0; }\n", encoding="ascii")
+        target = "{}-apple-macos{}".format(
+            ctx.target.architecture, ctx.observed_build_environment["deployment_target"],
+        )
+        ctx.run([target_bin / "clang", "--target=" + target, "-fuse-ld=lld",
+                 "-nostdlib", source, "-o", ctx.build_dir / "link-check"])
 
     resource_headers = built_library / "clang" / "17" / "include"
     if not (resource_headers / "stddef.h").is_file():

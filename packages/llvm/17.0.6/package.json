@@ -49,7 +49,7 @@
       "bin/clang",
       "bin/clang++",
       "bin/lld",
-      "bin/ld.lld",
+      "bin/ld64.lld",
       "bin/llvm-ar",
       "bin/llvm-objcopy",
       "lib/libLLVM.dylib",
