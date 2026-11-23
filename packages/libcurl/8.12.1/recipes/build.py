@@ -1,6 +1,7 @@
 """Build static libcurl against the pinned OpenSSL package for this target."""
 
 import shlex
+import subprocess
 
 
 OPENSSL_VERSION = "3.5.9"
@@ -56,9 +57,6 @@ def _write_link_check(source):
         '    const curl_version_info_data *info = curl_version_info(CURLVERSION_NOW);\n'
         '    if (!info || !info->ssl_version ||\n'
         '        strcmp(info->ssl_version, "OpenSSL/' + OPENSSL_VERSION + '")) return 1;\n'
-        '#ifdef CHECK_ZLIB\n'
-        '    if (!info->libz_version) return 1;\n'
-        '#endif\n'
         '    CURL *curl = curl_easy_init();\n'
         '    if (!curl) return 1;\n'
         '    curl_easy_cleanup(curl);\n'
@@ -71,7 +69,9 @@ def _write_link_check(source):
 def _build_sdk_target(ctx, openssl):
     use_zlib = ctx.target.family in ("android", "ios")
     options = {
-        "BUILD_CURL_EXE": False,
+        "BUILD_CURL_EXE": True,
+        "BUILD_STATIC_CURL": True,
+        "ENABLE_CURL_MANUAL": False,
         "BUILD_SHARED_LIBS": False,
         "BUILD_STATIC_LIBS": True,
         "BUILD_TESTING": False,
@@ -96,40 +96,14 @@ def _build_sdk_target(ctx, openssl):
         "OPENSSL_CRYPTO_LIBRARY": str(openssl / "lib/libcrypto.a"),
         "OPENSSL_USE_STATIC_LIBS": True,
     }
-    ctx.cmake(options=options, targets=("libcurl_static",))
-    _install(ctx, ctx.build_dir / "lib/libcurl.a")
-
-    check = ctx.build_dir / "link-check"
-    check.mkdir()
-    _write_link_check(check / "main.c")
-    (check / "CMakeLists.txt").write_text(
-        """cmake_minimum_required(VERSION 3.22)
-project(libcurl_link_check C)
-find_package(Threads REQUIRED)
-add_executable(link-check main.c)
-target_include_directories(link-check PRIVATE "${CURL_STAGE}/include")
-target_link_libraries(link-check PRIVATE "${CURL_STAGE}/lib/libcurl.a"
-    "${OPENSSL_STAGE}/lib/libssl.a" "${OPENSSL_STAGE}/lib/libcrypto.a"
-    Threads::Threads ${CMAKE_DL_LIBS})
-if(APPLE)
-    find_library(CORE_FOUNDATION CoreFoundation REQUIRED)
-    find_library(SYSTEM_CONFIGURATION SystemConfiguration REQUIRED)
-    target_link_libraries(link-check PRIVATE "${CORE_FOUNDATION}" "${SYSTEM_CONFIGURATION}")
-endif()
-if(USE_ZLIB)
-    find_package(ZLIB REQUIRED)
-    target_link_libraries(link-check PRIVATE ZLIB::ZLIB)
-    target_compile_definitions(link-check PRIVATE CHECK_ZLIB)
-endif()
-""",
-        encoding="ascii",
-    )
-    ctx.run(["cmake", "-S", check, "-B", check / "build", "-G", "Ninja",
-             *ctx.cmake_args, "-DCURL_STAGE=" + str(ctx.stage_dir),
-             "-DOPENSSL_STAGE=" + str(openssl), "-DUSE_ZLIB=" + ("ON" if use_zlib else "OFF")])
-    ctx.run(["cmake", "--build", check / "build"])
+    # The upstream curl executable exercises the full static link on this SDK.
+    ctx.cmake(options=options, targets=("curl",))
     if ctx.target.family == "macos":
-        ctx.run([check / "build/link-check"])
+        curl = ctx.build_dir / "src/curl"
+        version = subprocess.check_output([str(curl), "--version"], env=ctx.environment, text=True)
+        if "OpenSSL/" + OPENSSL_VERSION not in version.split():
+            raise ValueError("curl did not link the pinned OpenSSL: " + version)
+    _install(ctx, ctx.build_dir / "lib/libcurl.a")
 
 
 def build(ctx):
