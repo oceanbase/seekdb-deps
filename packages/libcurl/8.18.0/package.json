@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "name": "libcurl",
+  "version": "8.18.0",
+  "supported_targets": [
+    "windows-x86_64-md"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://github.com/curl/curl/releases/download/curl-8_18_0/curl-8.18.0.tar.gz",
+    "repository": "https://github.com/curl/curl.git",
+    "tag": "curl-8_18_0",
+    "revision": "2eebc58c4b8d68c98c8344381a9f6df4cca838fd",
+    "archive_sha256": "e9274a5f8ab5271c0e0e6762d2fce194d5f98acc568e4ce816845b2dcc0cf88f",
+    "strip_prefix": "curl-8.18.0",
+    "extra_archives": [
+      {
+        "path": "zlib",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/zlib-1.4/zlib-1.4-bin-windows-x86_64-md-20261105-011c485ba4bf.tar.gz",
+        "archive_sha256": "dcb67fdba7ab3c827329bf90f11cdcca57ae5d30fa8482a3804c4b2c1fecd681",
+        "strip_prefix": "zlib-1.4"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "curl",
+    "source_path": "COPYING"
+  },
+  "required_artifacts": {
+    "windows": [
+      "include/curl/curl.h",
+      "include/curl/curlver.h",
+      "lib/libcurl.lib",
+      "share/licenses/libcurl/LICENSE"
+    ]
+  }
+}
