@@ -88,6 +88,8 @@ def build(ctx):
         "CURL_STATIC_CRT": False,
         "CURL_USE_SCHANNEL": True,
         "CURL_USE_OPENSSL": False,
+        "CURL_DISABLE_LDAP": True,
+        "CURL_DISABLE_LDAPS": True,
         "CURL_USE_PKGCONFIG": False,
         "CURL_USE_LIBPSL": False,
         "CURL_USE_LIBSSH2": False,
