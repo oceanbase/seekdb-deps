@@ -80,6 +80,7 @@ def build(ctx):
         "BUILD_CURL_EXE": False,
         "BUILD_SHARED_LIBS": True,
         "BUILD_STATIC_LIBS": False,
+        "IMPORT_LIB_SUFFIX": "",
         "BUILD_TESTING": False,
         "BUILD_EXAMPLES": False,
         "BUILD_LIBCURL_DOCS": False,

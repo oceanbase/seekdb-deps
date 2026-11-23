@@ -111,6 +111,11 @@ target_include_directories(link-check PRIVATE "${CURL_STAGE}/include")
 target_link_libraries(link-check PRIVATE "${CURL_STAGE}/lib/libcurl.a"
     "${OPENSSL_STAGE}/lib/libssl.a" "${OPENSSL_STAGE}/lib/libcrypto.a"
     Threads::Threads ${CMAKE_DL_LIBS})
+if(APPLE)
+    find_library(CORE_FOUNDATION CoreFoundation REQUIRED)
+    find_library(SYSTEM_CONFIGURATION SystemConfiguration REQUIRED)
+    target_link_libraries(link-check PRIVATE "${CORE_FOUNDATION}" "${SYSTEM_CONFIGURATION}")
+endif()
 if(USE_ZLIB)
     find_package(ZLIB REQUIRED)
     target_link_libraries(link-check PRIVATE ZLIB::ZLIB)
