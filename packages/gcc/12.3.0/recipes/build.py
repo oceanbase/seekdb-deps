@@ -27,6 +27,8 @@ def build(ctx):
     configure = [
         str(ctx.source_dir / "configure"),
         "--build=" + triple,
+        "--host=" + triple,
+        "--target=" + triple,
         "--prefix=/" + BUILD_INSTALL_PREFIX.as_posix(),
         "--enable-languages=c,c++",
         "--disable-bootstrap",
