@@ -3,6 +3,12 @@
   "name": "libcurl",
   "version": "8.18.0",
   "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
+    "android-arm64-v8a-api26",
+    "ios-arm64-device-min18",
+    "ios-arm64-simulator-min18",
     "windows-x86_64-md"
   ],
   "source": {
@@ -14,6 +20,42 @@
     "archive_sha256": "e9274a5f8ab5271c0e0e6762d2fce194d5f98acc568e4ce816845b2dcc0cf88f",
     "strip_prefix": "curl-8.18.0",
     "extra_archives": [
+      {
+        "path": "openssl-linux-x86_64-glibc217",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-linux-x86_64-glibc217-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "dc2b745ce912ccff3359c1beb3418111acfcd19d696d4cf269b5965e7cd43d6e",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-linux-aarch64-glibc217",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-linux-aarch64-glibc217-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "4ed1c5b31af2ac66b0fae861f7520e840297b58845b2d7e500b52d948bbdc9ed",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-macos-arm64-min13",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-macos-arm64-min13-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "16ef56becc490a61ed545d9c1d50493254753c5a91fedbaebf0306c113637ae3",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-android-arm64-v8a-api26",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-android-arm64-v8a-api26-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "c8cf77720b754f3badb35ce2e217b56a014b3922295a9e0cd1aa0e835c1e5a4e",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-ios-arm64-device-min18",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-ios-arm64-device-min18-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "855dbe6a3e1e5f60ead1a3b27f537c8082e4c6caf65fd83746acd39c09444da0",
+        "strip_prefix": "openssl-3.5.9"
+      },
+      {
+        "path": "openssl-ios-arm64-simulator-min18",
+        "url": "https://github.com/oceanbase/seekdb-deps/releases/download/openssl-3.5.9/openssl-3.5.9-bin-ios-arm64-simulator-min18-20261120T071231%2B0000-c79e60669ad8.tar.gz",
+        "archive_sha256": "ba6fd3cbd8808fc7acb7249788d78370857857c690cf17bd994b622cf7dd23e4",
+        "strip_prefix": "openssl-3.5.9"
+      },
       {
         "path": "zlib",
         "url": "https://github.com/oceanbase/seekdb-deps/releases/download/zlib-1.4/zlib-1.4-bin-windows-x86_64-md-20261105-011c485ba4bf.tar.gz",
@@ -29,6 +71,11 @@
     "source_path": "COPYING"
   },
   "required_artifacts": {
+    "default": [
+      "include/curl/curl.h",
+      "include/curl/curlver.h",
+      "lib/libcurl.a"
+    ],
     "windows": [
       "include/curl/curl.h",
       "include/curl/curlver.h",
