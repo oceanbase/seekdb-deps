@@ -1,4 +1,4 @@
-"""Build the Windows libcurl DLL with Schannel and privately linked zlib."""
+"""Build static Windows libcurl with Schannel and a separate zlib archive."""
 
 import gzip
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -8,15 +8,13 @@ import subprocess
 from threading import Thread
 
 
-def _verify_windows(ctx, dll):
-    dumpbin = shutil.which("dumpbin", path=ctx.environment["PATH"])
-    if not dumpbin:
-        raise ValueError("dumpbin was not found in the Visual Studio environment")
-    imports = subprocess.check_output([dumpbin, "/dependents", str(dll)],
-                                      env=ctx.environment, text=True)
-    if re.search(r"^\s*zlib\S*\.dll\s*$", imports, re.I | re.M):
-        raise ValueError("libcurl.dll must link zlib statically")
+WINDOWS_SYSTEM_LIBS = (
+    "ws2_32.lib", "iphlpapi.lib", "bcrypt.lib", "advapi32.lib",
+    "crypt32.lib", "secur32.lib",
+)
 
+
+def _verify_windows(ctx, zlib):
     check = ctx.build_dir / "link-check"
     check.mkdir()
     source = check / "main.c"
@@ -44,10 +42,17 @@ int main(int argc, char **argv) {
         encoding="ascii",
     )
     client = check / "link-check.exe"
-    ctx.run([ctx.observed_build_environment["c_compiler"], "/nologo", "/MD",
+    ctx.run([ctx.observed_build_environment["c_compiler"], "/nologo", "/MD", "/DCURL_STATICLIB",
              "/I" + str(ctx.stage_dir / "include"), source, "/Fe" + str(client),
-             ctx.stage_dir / "lib/libcurl.lib"], cwd=check)
-    shutil.copy2(dll, check / dll.name)
+             ctx.stage_dir / "lib/libcurl.lib", zlib, *WINDOWS_SYSTEM_LIBS], cwd=check)
+
+    dumpbin = shutil.which("dumpbin", path=ctx.environment["PATH"])
+    if not dumpbin:
+        raise ValueError("dumpbin was not found in the Visual Studio environment")
+    imports = subprocess.check_output([dumpbin, "/dependents", str(client)],
+                                      env=ctx.environment, text=True)
+    if re.search(r"^\s*(?:libcurl|zlib)\S*\.dll\s*$", imports, re.I | re.M):
+        raise ValueError("The test executable must link both libcurl and zlib statically")
     payload = b"seekdb-deps curl gzip check"
     compressed = gzip.compress(payload)
 
@@ -78,9 +83,8 @@ def build(ctx):
     zlib = ctx.source_dir / "zlib"
     options = {
         "BUILD_CURL_EXE": False,
-        "BUILD_SHARED_LIBS": True,
-        "BUILD_STATIC_LIBS": False,
-        "IMPORT_LIB_SUFFIX": "",
+        "BUILD_SHARED_LIBS": False,
+        "BUILD_STATIC_LIBS": True,
         "BUILD_TESTING": False,
         "BUILD_EXAMPLES": False,
         "BUILD_LIBCURL_DOCS": False,
@@ -101,15 +105,15 @@ def build(ctx):
         "ZLIB_INCLUDE_DIR": str(zlib / "include"),
         "ZLIB_LIBRARY": str(zlib / "lib/libzs.lib"),
     }
-    ctx.cmake(options=options, targets=("libcurl_shared",))
-    ctx.install(ctx.build_dir / "lib/libcurl.dll", "bin/libcurl.dll")
+    ctx.cmake(options=options, targets=("libcurl_static",))
     ctx.install(ctx.build_dir / "lib/libcurl.lib", "lib/libcurl.lib")
     for header in sorted((ctx.source_dir / "include/curl").glob("*.h")):
         ctx.install(header, "include/curl/" + header.name)
-    ctx.install(zlib / "share/licenses/zlib/LICENSE", "share/licenses/zlib/LICENSE")
-    _verify_windows(ctx, ctx.stage_dir / "bin/libcurl.dll")
+    _verify_windows(ctx, zlib / "lib/libzs.lib")
     ctx.observed_build_environment.update({
         "curl_tls_backend": "Schannel",
-        "zlib_linkage": "static",
+        "curl_linkage": "static",
+        "zlib_linkage": "separate-static",
+        "windows_system_libraries": list(WINDOWS_SYSTEM_LIBS),
         "windows_gzip_check": "passed",
     })

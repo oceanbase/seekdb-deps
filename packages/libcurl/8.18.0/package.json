@@ -33,9 +33,7 @@
       "include/curl/curl.h",
       "include/curl/curlver.h",
       "lib/libcurl.lib",
-      "bin/libcurl.dll",
-      "share/licenses/libcurl/LICENSE",
-      "share/licenses/zlib/LICENSE"
+      "share/licenses/libcurl/LICENSE"
     ]
   }
 }
