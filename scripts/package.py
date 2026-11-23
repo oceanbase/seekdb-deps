@@ -215,8 +215,7 @@ def extract_source_archive(archive_path, destination, strip_prefix):
                     raise ValueError("Upstream source archive contains a symlink parent: " + str(relative))
                 parent = parent.parent
 
-        entries.sort(key=lambda item: (0 if item[2] == "directory" else 1 if item[2] == "file" else 2,
-                                       len(item[1].parts), item[1].as_posix()))
+        # Read compressed archives in member order to avoid restarting decompression.
         for member, relative, kind in entries:
             output_path = destination.joinpath(*relative.parts)
             if kind == "directory":
