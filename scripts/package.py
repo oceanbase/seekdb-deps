@@ -7,13 +7,11 @@ import hashlib
 import importlib.util
 import json
 import os
-import posixpath
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 from pathlib import PurePosixPath
 from urllib.request import Request, urlopen
@@ -160,78 +158,11 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
 
 
 def extract_source_archive(archive_path, destination, strip_prefix):
-    prefix = PurePosixPath(strip_prefix).parts
     destination.mkdir(parents=True)
-    with tarfile.open(str(archive_path), mode="r:*") as archive:
-        entries = []
-        seen = {}
-        symlink_paths = set()
-        found_prefix = False
-        for member in archive.getmembers():
-            name = PurePosixPath(member.name)
-            if (not member.name or "\\" in member.name or name.is_absolute()
-                    or any(part == ".." for part in name.parts)
-                    or (name.parts and re.match(r"^[A-Za-z]:", name.parts[0]))):
-                raise ValueError("Unsafe path in upstream source archive: " + member.name)
-            if name.parts[:len(prefix)] != prefix:
-                raise ValueError("Unexpected path in upstream source archive: " + member.name)
-            found_prefix = True
-            relative_parts = name.parts[len(prefix):]
-            if not relative_parts:
-                if not member.isdir():
-                    raise ValueError("Source archive root is not a directory")
-                continue
-            relative = PurePosixPath(*relative_parts)
-            if any(re.match(r"^[A-Za-z]:", part) for part in relative.parts):
-                raise ValueError("Unsafe path in upstream source archive: " + member.name)
-            if member.isdir():
-                kind = "directory"
-            elif member.isfile():
-                kind = "file"
-            elif member.issym():
-                linkname = member.linkname
-                if not linkname or "\\" in linkname or PurePosixPath(linkname).is_absolute():
-                    raise ValueError("Unsafe symlink in upstream source archive: " + member.name)
-                resolved = PurePosixPath(posixpath.normpath(
-                    posixpath.join(relative.parent.as_posix(), linkname)
-                ))
-                if resolved.parts and resolved.parts[0] == "..":
-                    raise ValueError("Upstream source symlink escapes source root: " + member.name)
-                kind = "symlink"
-                symlink_paths.add(relative)
-            else:
-                raise ValueError("Unsupported entry in upstream source archive: " + member.name)
-            if relative in seen and not (kind == "directory" and seen[relative] == "directory"):
-                raise ValueError("Duplicate path in upstream source archive: " + member.name)
-            seen[relative] = kind
-            entries.append((member, relative, kind))
-
-        if not found_prefix:
-            raise ValueError("Source archive does not contain strip_prefix " + strip_prefix)
-        for _, relative, _ in entries:
-            parent = relative.parent
-            while parent != PurePosixPath("."):
-                if parent in symlink_paths:
-                    raise ValueError("Upstream source archive contains a symlink parent: " + str(relative))
-                parent = parent.parent
-
-        # Read compressed archives in member order to avoid restarting decompression.
-        for member, relative, kind in entries:
-            output_path = destination.joinpath(*relative.parts)
-            if kind == "directory":
-                output_path.mkdir(parents=True, exist_ok=True)
-            elif kind == "file":
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                stream = archive.extractfile(member)
-                if stream is None:
-                    raise ValueError("Unable to read upstream source archive file: " + member.name)
-                with stream, output_path.open("wb") as output:
-                    shutil.copyfileobj(stream, output)
-                if os.name != "nt":
-                    output_path.chmod(member.mode & 0o777)
-            else:
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                os.symlink(member.linkname, str(output_path), target_is_directory=False)
+    run([
+        "tar", "-xf", archive_path, "-C", destination,
+        "--strip-components", str(len(PurePosixPath(strip_prefix).parts)),
+    ])
     return destination
 
 
