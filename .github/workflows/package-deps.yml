@@ -266,11 +266,11 @@ jobs:
           if ($archiveHash -ne 'de198bc58374abf21d9038f4d6eadd345e1f1798dc9b24f6326965cfb6e0631f') { throw "Unexpected source bundle $archiveHash" }
           Write-Output "SOURCE_BUNDLE_SHA256=$archiveHash"
           New-Item -ItemType Directory -Force 'source-bundle' | Out-Null
-          & tar -xf $archive -C 'source-bundle' --strip-components 1
+          python -c "import tarfile,sys; archive=tarfile.open(sys.argv[1], 'r|gz'); archive.extractall(sys.argv[2]); archive.close()" $archive 'source-bundle'
           if ($LASTEXITCODE -ne 0) { throw 'Source bundle extraction failed' }
-          $manifest = Get-Content 'source-bundle/manifest.json' -Raw | ConvertFrom-Json
+          $manifest = Get-Content 'source-bundle/seekdb-deps-boost-1.74.0/manifest.json' -Raw | ConvertFrom-Json
           if ($manifest.seekdb_deps_commit -ne '68177a7d117d05f336878ee3a14db955b91c46f6') { throw 'Unexpected source bundle commit' }
-          $scriptHash = (Get-FileHash 'source-bundle/scripts/package.py' -Algorithm SHA256).Hash.ToLower()
+          $scriptHash = (Get-FileHash 'source-bundle/seekdb-deps-boost-1.74.0/scripts/package.py' -Algorithm SHA256).Hash.ToLower()
           if ($scriptHash -ne 'c4e3653839f80bf0788e759c8383920a6577bb22dcb0d3b8b680b38468fc7a92') { throw "Unexpected packaging script $scriptHash" }
           Write-Output "PACKAGING_SOURCE_COMMIT=$($manifest.seekdb_deps_commit)"
           Write-Output "PACKAGING_SCRIPT_SHA256=$scriptHash"
@@ -280,7 +280,7 @@ jobs:
         if: ${{ matrix.target.family == 'windows' }}
         shell: pwsh
         run: >-
-          python source-bundle/scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
+          python source-bundle/seekdb-deps-boost-1.74.0/scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
           --kind binary --target $env:TARGET_PROFILE --timestamp $env:RELEASE_TIMESTAMP
           --jobs $env:BUILD_JOBS --output dist
 
