@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "name": "boost",
+  "version": "1.74.0",
+  "source": {
+    "path": "source",
+    "url": "https://archives.boost.io/release/1.74.0/source/boost_1_74_0.tar.bz2",
+    "repository": "https://github.com/boostorg/boost.git",
+    "tag": "boost-1.74.0",
+    "revision": "a7090e8ce184501cfc9e80afa6cafb5bfd3b371c",
+    "archive_sha256": "83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1",
+    "strip_prefix": "boost_1_74_0"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [
+    "patches/mpl-integral-wrapper.patch",
+    "patches/numeric-conversion-enum-constants.patch"
+  ],
+  "license": {
+    "spdx_id": "BSL-1.0",
+    "source_path": "LICENSE_1_0.txt"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/boost/version.hpp",
+      "include/boost/geometry.hpp",
+      "include/boost/spirit/include/phoenix.hpp",
+      "include/boost/spirit/include/qi.hpp"
+    ]
+  }
+}

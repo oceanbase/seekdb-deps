@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "name": "croaring",
+  "version": "3.0.0",
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/RoaringBitmap/CRoaring/tar.gz/refs/tags/v3.0.0",
+    "repository": "https://github.com/RoaringBitmap/CRoaring.git",
+    "tag": "v3.0.0",
+    "revision": "083d39855d6ba51d3645929fcd44153a1b2f14d8",
+    "archive_sha256": "25183bc54ab650d964256d547869a34573a13d06f7e6a369b79e77f5c1feb8ba",
+    "strip_prefix": "CRoaring-3.0.0"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Apache-2.0 OR MIT",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "default": [
+      "include/roaring/roaring.h",
+      "include/roaring/roaring64.h",
+      "include/roaring/roaring.hh",
+      "include/roaring/roaring64map.hh",
+      "lib/libroaring.a"
+    ],
+    "windows": [
+      "include/roaring/roaring.h",
+      "include/roaring/roaring64.h",
+      "include/roaring/roaring.hh",
+      "include/roaring/roaring64map.hh",
+      "lib/roaring.lib",
+      "bin/roaring.dll"
+    ]
+  }
+}
