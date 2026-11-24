@@ -2,6 +2,8 @@
 """Build pinned dependency source bundles and platform-specific binary packages."""
 
 import argparse
+from functools import wraps
+from time import perf_counter
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -25,6 +27,27 @@ from build import RecipeContext, load_target
 from init_build_env import initialize_build_environment
 
 
+def diagnostic_phase(name):
+    def decorate(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            started = perf_counter()
+            print("DIAGNOSTIC BEGIN " + name, flush=True)
+            try:
+                return function(*args, **kwargs)
+            finally:
+                print("DIAGNOSTIC END {} elapsed={:.3f}s".format(
+                    name, perf_counter() - started
+                ), flush=True)
+        return wrapped
+    return decorate
+
+
+initialize_build_environment = diagnostic_phase("initialize environment")(initialize_build_environment)
+write_manifest = diagnostic_phase("write manifest")(write_manifest)
+create_archive = diagnostic_phase("create output archive")(create_archive)
+
+
 def run(argv, *, cwd=None, capture=False):
     result = subprocess.run(
         [str(value) for value in argv],
@@ -37,6 +60,7 @@ def run(argv, *, cwd=None, capture=False):
     return result.stdout.strip() if capture else ""
 
 
+@diagnostic_phase('source SHA256')
 def sha256(path):
     return sha256_file(path)
 
@@ -122,6 +146,7 @@ def git_root():
     return Path(result.stdout.strip()).resolve()
 
 
+@diagnostic_phase('repository commit')
 def repository_commit():
     top = git_root()
     if top is None or top != ROOT.resolve():
@@ -136,6 +161,7 @@ def repository_commit():
     return run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture=True), True
 
 
+@diagnostic_phase('download and verify source')
 def download_source_archive(source, workspace, filename="upstream-source.tar.gz"):
     archive_path = workspace / filename
     request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
@@ -143,7 +169,21 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
         if not response.geturl().startswith("https://"):
             raise ValueError("Package source download did not remain on HTTPS")
         with archive_path.open("wb") as output:
-            shutil.copyfileobj(response, output)
+            total = 0
+            reported = 0
+            started = perf_counter()
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+                total += len(chunk)
+                if total - reported >= 5 * 1024 * 1024:
+                    print("DIAGNOSTIC downloaded={} bytes elapsed={:.3f}s".format(
+                        total, perf_counter() - started
+                    ), flush=True)
+                    reported = total
+            print("DIAGNOSTIC download complete bytes={}".format(total), flush=True)
 
     actual_sha256 = sha256(archive_path)
     expected_sha256 = source["archive_sha256"].lower()
@@ -157,7 +197,10 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
     return archive_path
 
 
+@diagnostic_phase('extract source')
 def extract_source_archive(archive_path, destination, strip_prefix):
+    print("DIAGNOSTIC tar executable=" + str(shutil.which("tar")), flush=True)
+    run(["tar", "--version"])
     destination.mkdir(parents=True)
     run([
         "tar", "-xf", archive_path, "-C", destination,
@@ -232,6 +275,7 @@ def patch_records(package_root, metadata):
     return records
 
 
+@diagnostic_phase('copy source tree')
 def copy_tree(source, destination):
     shutil.copytree(
         source, destination,
@@ -250,6 +294,7 @@ def copy_repository_inputs(destination, package_root):
     copy_tree(package_root, package_destination)
 
 
+@diagnostic_phase('prepare and patch source')
 def apply_patches(package_root, metadata, source_dir, workspace):
     patches = patch_records(package_root, metadata)
     prepared = workspace / "source"
@@ -355,7 +400,7 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
     except ValueError:
         raise ValueError("Recipe path escapes package directory")
     recipe = load_recipe(recipe_path)
-    recipe(context)
+    diagnostic_phase("install target files")(recipe)(context)
 
     license_source = prepared_source / safe_relative(metadata["license"]["source_path"], "license.source_path")
     if not license_source.is_file():
@@ -464,6 +509,11 @@ def main():
             os.replace(str(artifact["path"]), str(final_path))
             os.replace(str(artifact["checksum"]), str(final_path.with_name(final_path.name + ".sha256")))
             published.append((final_path, artifact["sha256"]))
+        print("DIAGNOSTIC BEGIN cleanup workspace", flush=True)
+        cleanup_started = perf_counter()
+    print("DIAGNOSTIC END cleanup workspace elapsed={:.3f}s".format(
+        perf_counter() - cleanup_started
+    ), flush=True)
     for path, digest in published:
         print("{}  {}".format(path, digest))
 

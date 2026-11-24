@@ -108,6 +108,7 @@ jobs:
         target: ${{ fromJSON(needs.prepare.outputs.targets) }}
     name: Build ${{ matrix.target.id }}
     runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 10
     env:
       PACKAGE_NAME: ${{ inputs.package }}
       PACKAGE_VERSION: ${{ inputs.version }}
