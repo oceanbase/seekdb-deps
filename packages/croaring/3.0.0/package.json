@@ -12,7 +12,9 @@
     "strip_prefix": "CRoaring-3.0.0"
   },
   "recipe": "recipes/build.py",
-  "patches": [],
+  "patches": [
+    "patches/portable-byteswap.patch"
+  ],
   "license": {
     "spdx_id": "Apache-2.0 OR MIT",
     "source_path": "LICENSE"

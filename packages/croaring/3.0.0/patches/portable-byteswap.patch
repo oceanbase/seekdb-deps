@@ -1,0 +1,12 @@
+Use the public byteswap.h interface, which Android's libc also exposes.
+
+diff --git a/include/roaring/portability.h b/include/roaring/portability.h
+--- a/include/roaring/portability.h
++++ b/include/roaring/portability.h
+@@ -440,5 +440,5 @@
+     __has_include(<byteswap.h>)  // CROARING_IS_BIG_ENDIAN
+ #include <byteswap.h>
+-#define croaring_htobe64(x) __bswap_64(x)
++#define croaring_htobe64(x) bswap_64(x)
+
+ #else  // CROARING_IS_BIG_ENDIAN
