@@ -2,6 +2,7 @@
 """Build pinned dependency source bundles and platform-specific binary packages."""
 
 import argparse
+import bz2
 from functools import wraps
 from time import perf_counter
 from datetime import datetime, timezone
@@ -202,10 +203,46 @@ def extract_source_archive(archive_path, destination, strip_prefix):
     print("DIAGNOSTIC tar executable=" + str(shutil.which("tar")), flush=True)
     run(["tar", "--version"])
     destination.mkdir(parents=True)
+    strip = str(len(PurePosixPath(strip_prefix).parts))
+    with archive_path.open("rb") as source:
+        bzip2_archive = source.read(3) == b"BZh"
+    if os.name == "nt" and bzip2_archive:
+        native_probe = destination.with_name(destination.name + "-native-probe")
+        native_probe.mkdir()
+        started = perf_counter()
+        try:
+            subprocess.run([
+                "tar", "-xf", str(archive_path), "-C", str(native_probe),
+                "--strip-components", strip,
+            ], check=True, timeout=120)
+            print("DIAGNOSTIC native bzip2 extraction completed", flush=True)
+        except subprocess.TimeoutExpired:
+            print("DIAGNOSTIC native bzip2 extraction timed out at 120s", flush=True)
+        except subprocess.CalledProcessError as error:
+            print("DIAGNOSTIC native bzip2 extraction failed code={}".format(error.returncode), flush=True)
+        print("DIAGNOSTIC native probe files={} elapsed={:.3f}s".format(
+            sum(path.is_file() for path in native_probe.rglob("*")),
+            perf_counter() - started,
+        ), flush=True)
+        plain = archive_path.with_name(archive_path.name + ".plain.tar")
+        started = perf_counter()
+        print("DIAGNOSTIC BEGIN sequential Python bzip2 decompression", flush=True)
+        with bz2.open(archive_path, "rb") as source, plain.open("wb") as output:
+            shutil.copyfileobj(source, output)
+        print("DIAGNOSTIC END sequential Python bzip2 decompression bytes={} elapsed={:.3f}s".format(
+            plain.stat().st_size, perf_counter() - started
+        ), flush=True)
+        archive_path = plain
+    started = perf_counter()
+    print("DIAGNOSTIC BEGIN tar extraction of " + str(archive_path), flush=True)
     run([
         "tar", "-xf", archive_path, "-C", destination,
-        "--strip-components", str(len(PurePosixPath(strip_prefix).parts)),
+        "--strip-components", strip,
     ])
+    print("DIAGNOSTIC END tar extraction files={} elapsed={:.3f}s".format(
+        sum(path.is_file() for path in destination.rglob("*")),
+        perf_counter() - started,
+    ), flush=True)
     return destination
 
 
