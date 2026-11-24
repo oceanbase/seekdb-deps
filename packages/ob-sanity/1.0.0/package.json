@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "ob-sanity",
+  "version": "1.0.0",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/oceanbase/ob-sanity/tar.gz/926ccb8ebac0e78cbfd6d15871e2b184c92189d5",
+    "repository": "https://github.com/oceanbase/ob-sanity.git",
+    "tag": "",
+    "revision": "926ccb8ebac0e78cbfd6d15871e2b184c92189d5",
+    "archive_sha256": "efc12f379797ea14c61e05fb4fce5c3e7bc2c08b32f68322309c3c4d790bd2d2",
+    "strip_prefix": "ob-sanity-926ccb8ebac0e78cbfd6d15871e2b184c92189d5",
+    "extra_archives": [
+      {
+        "path": "llvm",
+        "url": "https://codeload.github.com/llvm/llvm-project/tar.gz/refs/tags/llvmorg-18.1.8",
+        "archive_sha256": "09c08693a9afd6236f27a2ebae62cda656eba19021ef3f94d59e931d662d4856",
+        "strip_prefix": "llvm-project-llvmorg-18.1.8"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "LICENSE"
+  },
+  "required_artifacts": {
+    "linux": [
+      "include/sanity/sanity.h",
+      "lib/libsanitypass.so"
+    ]
+  }
+}
