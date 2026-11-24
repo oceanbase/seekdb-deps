@@ -51,6 +51,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   prepare:
@@ -61,6 +62,8 @@ jobs:
       targets: ${{ steps.inputs.outputs.targets }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - id: inputs
         env:
@@ -69,7 +72,7 @@ jobs:
           REQUESTED_KIND: ${{ inputs.kind }}
           REQUESTED_TARGET: ${{ inputs.target }}
           REQUESTED_TIMESTAMP: ${{ inputs.timestamp }}
-          REPOSITORY_SHA: ${{ github.sha }}
+          REPOSITORY_SHA: 68177a7d117d05f336878ee3a14db955b91c46f6
         run: python3 .github/scripts/prepare_package_matrix.py
 
   source:
@@ -78,6 +81,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - uses: actions/setup-python@v7
         with:
@@ -108,6 +113,7 @@ jobs:
         target: ${{ fromJSON(needs.prepare.outputs.targets) }}
     name: Build ${{ matrix.target.id }}
     runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 15
     env:
       PACKAGE_NAME: ${{ inputs.package }}
       PACKAGE_VERSION: ${{ inputs.version }}
@@ -116,6 +122,8 @@ jobs:
       TARGET_PROFILE: ${{ matrix.target.id }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - uses: actions/setup-python@v7
         if: ${{ matrix.target.family != 'linux' }}
@@ -236,11 +244,43 @@ jobs:
             --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP" \
             --jobs "$BUILD_JOBS" --output dist
 
+      - name: Download pinned Boost source bundle
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GODEBUG: http2client=0
+        run: |
+          foreach ($name in @('http_proxy','https_proxy','all_proxy','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY')) {
+            Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+          }
+          gh run download 45384979945 --repo oceanbase/seekdb-deps --name 'boost-1.74.0-source-20261124T113146+0000-68177a7d117d' --dir downloaded-source
+          if ($LASTEXITCODE -ne 0) { throw 'Source artifact download failed' }
+
+      - name: Verify and extract pinned Boost source bundle
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        run: |
+          $archive = Join-Path 'downloaded-source' 'boost-1.74.0-src-20261124T113146+0000-68177a7d117d.tar.gz'
+          $archiveHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($archiveHash -ne 'de198bc58374abf21d9038f4d6eadd345e1f1798dc9b24f6326965cfb6e0631f') { throw "Unexpected source bundle $archiveHash" }
+          Write-Output "SOURCE_BUNDLE_SHA256=$archiveHash"
+          New-Item -ItemType Directory -Force 'source-bundle' | Out-Null
+          & tar -xf $archive -C 'source-bundle' --strip-components 1
+          if ($LASTEXITCODE -ne 0) { throw 'Source bundle extraction failed' }
+          $manifest = Get-Content 'source-bundle/manifest.json' -Raw | ConvertFrom-Json
+          if ($manifest.seekdb_deps_commit -ne '68177a7d117d05f336878ee3a14db955b91c46f6') { throw 'Unexpected source bundle commit' }
+          $scriptHash = (Get-FileHash 'source-bundle/scripts/package.py' -Algorithm SHA256).Hash.ToLower()
+          if ($scriptHash -ne 'c4e3653839f80bf0788e759c8383920a6577bb22dcb0d3b8b680b38468fc7a92') { throw "Unexpected packaging script $scriptHash" }
+          Write-Output "PACKAGING_SOURCE_COMMIT=$($manifest.seekdb_deps_commit)"
+          Write-Output "PACKAGING_SCRIPT_SHA256=$scriptHash"
+          Write-Output 'PACKAGING_SOURCE_MODE=verified-source-bundle'
+
       - name: Build Windows binary
         if: ${{ matrix.target.family == 'windows' }}
         shell: pwsh
         run: >-
-          python scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
+          python source-bundle/scripts/package.py $env:PACKAGE_NAME $env:PACKAGE_VERSION
           --kind binary --target $env:TARGET_PROFILE --timestamp $env:RELEASE_TIMESTAMP
           --jobs $env:BUILD_JOBS --output dist
 
