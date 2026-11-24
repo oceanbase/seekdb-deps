@@ -3,6 +3,9 @@
   "name": "llvm",
   "version": "18.1.8",
   "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13",
     "windows-x86_64-mt"
   ],
   "source": {
@@ -21,12 +24,50 @@
     "source_path": "LICENSE.TXT"
   },
   "required_artifacts": {
+    "linux": [
+      "bin/clang",
+      "bin/clang++",
+      "bin/lld",
+      "bin/llvm-ar",
+      "bin/llvm-objcopy",
+      "lib/clang/18/include/stddef.h",
+      "bin/ld.lld",
+      "bin/llvm-cxxfilt",
+      "bin/llvm-dwp",
+      "bin/llvm-nm",
+      "bin/llvm-objdump",
+      "bin/llvm-ranlib",
+      "bin/llvm-strip",
+      "bin/llvm-symbolizer",
+      "lib/libLLVM.so.18.1",
+      "lib/clang/18/include/sanitizer/asan_interface.h"
+    ],
+    "macos": [
+      "bin/clang",
+      "bin/clang++",
+      "bin/lld",
+      "bin/llvm-ar",
+      "bin/llvm-objcopy",
+      "lib/clang/18/include/stddef.h",
+      "bin/ld64.lld",
+      "lib/libLLVM.dylib"
+    ],
     "windows": [
       "bin/clang-cl.exe",
       "bin/lld-link.exe",
       "bin/llvm-lib.exe",
       "bin/llvm-rc.exe",
-      "lib/clang/18/include/stddef.h"
+      "lib/clang/18/include/stddef.h",
+      "bin/llvm-readobj.exe",
+      "bin/llvm-pdbutil.exe",
+      "lib/clang/18/lib/windows/clang_rt.builtins-x86_64.lib"
     ]
+  },
+  "build_dependencies": {
+    "linux": {
+      "system_packages": [
+        "patchelf"
+      ]
+    }
   }
 }
