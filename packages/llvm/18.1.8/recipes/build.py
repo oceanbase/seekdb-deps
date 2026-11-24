@@ -78,6 +78,23 @@ def _stage_llvm(ctx, tools, aliases, suffix):
     return target_bin
 
 
+def _build_zlib(ctx):
+    source = ctx.source_dir / "zlib"
+    build = ctx.build_dir / "zlib"
+    _configure(ctx, source, build, {
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "ZLIB_BUILD_SHARED": "OFF",
+        "ZLIB_BUILD_TESTING": "OFF",
+    }, base_args=ctx.cmake_args)
+    ctx.run(["cmake", "--build", build, "--parallel", ctx.jobs, "--target", "zlibstatic"])
+    shutil.copy2(source / "zlib.h", build / "zlib.h")
+    return {
+        "LLVM_ENABLE_ZLIB": "FORCE_ON",
+        "ZLIB_INCLUDE_DIR": build,
+        "ZLIB_LIBRARY": build / "libz.a",
+    }
+
+
 def _linux_driver_args(ctx):
     gcc = ctx.environment["CC"]
     gcc_library = Path(_output(ctx, [gcc, "-print-file-name=libgcc.a"]))
@@ -153,16 +170,19 @@ def _verify(ctx, target_bin):
             "#include <vector>\nint main() { return std::vector<int>{42}.front() != 42; }\n",
             encoding="ascii",
         )
-        driver_args = _linux_driver_args(ctx)
-        for name, flags in (
-            ("plain", []),
-            ("asan", ["-fsanitize=address"]),
-            ("ubsan", ["-fsanitize=undefined"]),
-        ):
+        clang = [target_bin / "clang++", *_linux_driver_args(ctx)]
+        linker_flags = ["-fuse-ld=lld", "-static-libstdc++", "-rtlib=compiler-rt",
+                        "-unwindlib=libgcc"]
+        obj = ctx.build_dir / "link-check.o"
+        ctx.run([*clang, "-g", "-c", source, "-o", obj])
+        # seekdb links prebuilts such as jemalloc with zlib-compressed DWARF.
+        ctx.run([target_bin / "llvm-objcopy", "--compress-debug-sections=zlib", obj])
+        exe = ctx.build_dir / "link-check-plain"
+        ctx.run([*clang, *linker_flags, obj, "-o", exe])
+        ctx.run([exe])
+        for name, sanitizer in (("asan", "address"), ("ubsan", "undefined")):
             exe = ctx.build_dir / ("link-check-" + name)
-            ctx.run([target_bin / "clang++", *driver_args, "-fuse-ld=lld",
-                     "-static-libstdc++", "-rtlib=compiler-rt", "-unwindlib=libgcc",
-                     *flags, source, "-o", exe])
+            ctx.run([*clang, *linker_flags, "-fsanitize=" + sanitizer, source, "-o", exe])
             ctx.run([exe])
     else:
         source.write_text("int main() { return 0; }\n", encoding="ascii")
@@ -211,6 +231,8 @@ def build(ctx):
         "CLANG_ENABLE_ARCMT": "OFF",
     }
     if family == "linux":
+        options.update(_build_zlib(ctx))
+        ctx.install(ctx.source_dir / "zlib/LICENSE", "share/licenses/zlib/LICENSE")
         options.update({
             "CMAKE_BUILD_WITH_INSTALL_RPATH": "ON",
             "CMAKE_INSTALL_RPATH": "$ORIGIN/../lib",

@@ -15,7 +15,15 @@
     "tag": "llvmorg-18.1.8",
     "revision": "3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff",
     "archive_sha256": "09c08693a9afd6236f27a2ebae62cda656eba19021ef3f94d59e931d662d4856",
-    "strip_prefix": "llvm-project-llvmorg-18.1.8"
+    "strip_prefix": "llvm-project-llvmorg-18.1.8",
+    "extra_archives": [
+      {
+        "path": "zlib",
+        "url": "https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.gz",
+        "archive_sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
+        "strip_prefix": "zlib-1.4"
+      }
+    ]
   },
   "recipe": "recipes/build.py",
   "patches": [],
