@@ -161,7 +161,8 @@ def _verify(ctx, target_bin):
         ):
             exe = ctx.build_dir / ("link-check-" + name)
             ctx.run([target_bin / "clang++", *driver_args, "-fuse-ld=lld",
-                     "-static-libstdc++", "-rtlib=compiler-rt", *flags, source, "-o", exe])
+                     "-static-libstdc++", "-rtlib=compiler-rt", "-unwindlib=libgcc",
+                     *flags, source, "-o", exe])
             ctx.run([exe])
     else:
         source.write_text("int main() { return 0; }\n", encoding="ascii")
