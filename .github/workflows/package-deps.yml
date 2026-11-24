@@ -61,6 +61,8 @@ jobs:
       targets: ${{ steps.inputs.outputs.targets }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - id: inputs
         env:
@@ -69,7 +71,7 @@ jobs:
           REQUESTED_KIND: ${{ inputs.kind }}
           REQUESTED_TARGET: ${{ inputs.target }}
           REQUESTED_TIMESTAMP: ${{ inputs.timestamp }}
-          REPOSITORY_SHA: ${{ github.sha }}
+          REPOSITORY_SHA: 68177a7d117d05f336878ee3a14db955b91c46f6
         run: python3 .github/scripts/prepare_package_matrix.py
 
   source:
@@ -78,6 +80,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - uses: actions/setup-python@v7
         with:
@@ -108,6 +112,7 @@ jobs:
         target: ${{ fromJSON(needs.prepare.outputs.targets) }}
     name: Build ${{ matrix.target.id }}
     runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 10
     env:
       PACKAGE_NAME: ${{ inputs.package }}
       PACKAGE_VERSION: ${{ inputs.version }}
@@ -116,6 +121,8 @@ jobs:
       TARGET_PROFILE: ${{ matrix.target.id }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: 68177a7d117d05f336878ee3a14db955b91c46f6
 
       - uses: actions/setup-python@v7
         if: ${{ matrix.target.family != 'linux' }}
@@ -235,6 +242,33 @@ jobs:
           python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION" \
             --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP" \
             --jobs "$BUILD_JOBS" --output dist
+
+      - name: Use GNU tar for Windows bzip2 archives
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        run: |
+          $gnuBin = Join-Path $env:ProgramFiles 'Git\usr\bin'
+          $gnuTar = Join-Path $gnuBin 'tar.exe'
+          if (-not (Test-Path $gnuTar)) { throw "GNU tar is missing: $gnuTar" }
+          & $gnuTar --version
+          $gnuBin >> $env:GITHUB_PATH
+          'TAR_OPTIONS=--force-local' >> $env:GITHUB_ENV
+
+      - name: Verify pinned Windows packaging inputs
+        if: ${{ matrix.target.family == 'windows' }}
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -ne '68177a7d117d05f336878ee3a14db955b91c46f6') { throw "Unexpected source commit $commit" }
+          $scriptBlob = (git hash-object --path=scripts/package.py scripts/package.py).Trim()
+          if ($scriptBlob -ne 'b4b5530a9bbda51bc3a015a87f31b3e04a65e66a') { throw "Unexpected packaging script blob $scriptBlob" }
+          $expectedTar = Join-Path $env:ProgramFiles 'Git\usr\bin\tar.exe'
+          $actualTar = (Get-Command tar).Source
+          if ($actualTar -ne $expectedTar) { throw "Unexpected tar executable $actualTar" }
+          Write-Output "PACKAGING_SOURCE_COMMIT=$commit"
+          Write-Output "PACKAGING_SCRIPT_BLOB=$scriptBlob"
+          Write-Output "PACKAGING_TAR=$actualTar"
+          & tar --version
 
       - name: Build Windows binary
         if: ${{ matrix.target.family == 'windows' }}
