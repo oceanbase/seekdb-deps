@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "name": "obshell",
+  "version": "4.5.1.3",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217"
+  ],
+  "prebuilt": {
+    "revision": "3714585c91107e46c86c9f3fe3a0369c9692959b",
+    "targets": {
+      "linux-x86_64-glibc217": {
+        "url": "https://mirrors.oceanbase.com/oceanbase/community/stable/el/7/x86_64/obshell-4.5.1.3-12026111915.el7.x86_64.rpm",
+        "archive_sha256": "6f864be226bfd77ade853dd98b9848761d3e82f2fff277f273f54efaabfb781f",
+        "files": {
+          "bin/obshell": "679ecc4aa551ca5ff40d38581fa9c68451fd9b42c30a676d6361205984ca5ed5"
+        }
+      },
+      "linux-aarch64-glibc217": {
+        "url": "https://mirrors.oceanbase.com/oceanbase/community/stable/el/7/aarch64/obshell-4.5.1.3-12026111915.el7.aarch64.rpm",
+        "archive_sha256": "3e4614bec54241c4218ebd321997f9fee42f9978a004e276b1383db4def2a38c",
+        "files": {
+          "bin/obshell": "be8315c6ada3939e00e592ac4981cc6f6926a053e7476500f2d6d2b049fd3cf6"
+        }
+      }
+    }
+  },
+  "recipe": "recipes/repack.py",
+  "license": {
+    "spdx_id": "Apache-2.0",
+    "source_path": "licenses/LICENSE",
+    "notice_path": "licenses/NOTICE"
+  },
+  "required_artifacts": {
+    "linux": ["bin/obshell"]
+  },
+  "build_dependencies": {
+    "linux": {
+      "system_packages": ["rpm2cpio", "cpio", "binutils"]
+    }
+  }
+}

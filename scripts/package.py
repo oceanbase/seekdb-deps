@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from archive import create_archive, sha256_file, verify_manifest, write_manifest
 from build import RecipeContext, load_target
-from init_build_env import initialize_build_environment
+from init_build_env import detect_host, initialize_build_environment
 
 
 def run(argv, *, cwd=None, capture=False):
@@ -69,13 +69,30 @@ def package_paths(name, version):
         raise ValueError("Package path and metadata name/version do not match")
     if metadata.get("schema_version") != 1:
         raise ValueError("Unsupported package metadata schema_version")
-    for field in ("source", "recipe", "license", "required_artifacts"):
+    for field in ("recipe", "license", "required_artifacts"):
         if field not in metadata:
             raise ValueError("Package metadata is missing field: " + field)
+    if "prebuilt" in metadata:
+        validate_prebuilt(metadata)
+    else:
+        validate_source(metadata["source"])
+    for field in ("spdx_id", "source_path"):
+        if field not in metadata["license"]:
+            raise ValueError("Package license metadata is missing field: " + field)
+    if "supported_targets" in metadata and (not isinstance(metadata["supported_targets"], list)
+            or not metadata["supported_targets"]):
+        raise ValueError("Package supported_targets must be a nonempty list")
+    for target in metadata.get("supported_targets", []):
+        if (not isinstance(target, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target)
+                or not (ROOT / "platforms" / (target + ".json")).is_file()):
+            raise ValueError("Unknown supported target: " + str(target))
+    return root, metadata
+
+
+def validate_source(source):
     for field in ("path", "url", "repository", "tag", "revision", "archive_sha256", "strip_prefix"):
-        if field not in metadata["source"]:
+        if field not in source:
             raise ValueError("Package source metadata is missing field: " + field)
-    source = metadata["source"]
     if not source["url"].startswith("https://"):
         raise ValueError("Package source URL must use HTTPS")
     safe_relative(source["path"], "source.path")
@@ -100,17 +117,28 @@ def package_paths(name, version):
             raise ValueError("Extra source archive URL must use HTTPS")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", extra["archive_sha256"]):
             raise ValueError("Extra source archive SHA256 must be a SHA256 digest")
-    for field in ("spdx_id", "source_path"):
-        if field not in metadata["license"]:
-            raise ValueError("Package license metadata is missing field: " + field)
-    if "supported_targets" in metadata and (not isinstance(metadata["supported_targets"], list)
-            or not metadata["supported_targets"]):
-        raise ValueError("Package supported_targets must be a nonempty list")
-    for target in metadata.get("supported_targets", []):
-        if (not isinstance(target, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target)
-                or not (ROOT / "platforms" / (target + ".json")).is_file()):
-            raise ValueError("Unknown supported target: " + str(target))
-    return root, metadata
+
+
+def validate_prebuilt(metadata):
+    if "source" in metadata or metadata.get("patches"):
+        raise ValueError("Prebuilt packages accept binary inputs only")
+    prebuilt = metadata["prebuilt"]
+    if not re.fullmatch(r"[0-9a-fA-F]{40,64}", prebuilt["revision"]):
+        raise ValueError("Prebuilt revision must be a Git object id")
+    inputs = prebuilt["targets"]
+    if not inputs or set(inputs) != set(metadata.get("supported_targets", [])):
+        raise ValueError("Prebuilt archives must match supported target profiles")
+    for archive in inputs.values():
+        if not archive["url"].startswith("https://"):
+            raise ValueError("Prebuilt archive URL must use HTTPS")
+        if not re.fullmatch(r"[0-9a-f]{64}", archive["archive_sha256"]):
+            raise ValueError("Prebuilt archive SHA256 must be a lowercase SHA256 digest")
+        if not archive["files"]:
+            raise ValueError("Prebuilt archive must pin at least one binary file")
+        for relative, checksum in archive["files"].items():
+            safe_relative(relative, "prebuilt file path")
+            if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                raise ValueError("Prebuilt file SHA256 must be a lowercase SHA256 digest")
 
 
 def git_root():
@@ -137,12 +165,12 @@ def repository_commit():
     return run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture=True), True
 
 
-def download_source_archive(source, workspace, filename="upstream-source.tar.gz"):
+def download_archive(source, workspace, filename="upstream-source.tar.gz"):
     archive_path = workspace / filename
     request = Request(source["url"], headers={"User-Agent": "seekdb-deps"})
     with urlopen(request, timeout=120) as response:
         if not response.geturl().startswith("https://"):
-            raise ValueError("Package source download did not remain on HTTPS")
+            raise ValueError("Package archive download did not remain on HTTPS")
         with archive_path.open("wb") as output:
             shutil.copyfileobj(response, output)
 
@@ -151,7 +179,7 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
     if actual_sha256 != expected_sha256:
         archive_path.unlink()
         raise ValueError(
-            "Downloaded source SHA256 mismatch: expected {}, found {}".format(
+            "Downloaded archive SHA256 mismatch: expected {}, found {}".format(
                 expected_sha256, actual_sha256
             )
         )
@@ -203,7 +231,7 @@ def source_revision(package_root, metadata, repo_checkout, workspace):
         return source["revision"], source_dir
 
     workspace.mkdir(parents=True, exist_ok=True)
-    archive_path = download_source_archive(source, workspace)
+    archive_path = download_archive(source, workspace)
     source_dir = workspace / "source"
     extract_source_archive(archive_path, source_dir, source["strip_prefix"])
     for index, extra in enumerate(source.get("extra_archives", [])):
@@ -211,7 +239,7 @@ def source_revision(package_root, metadata, repo_checkout, workspace):
         destination = source_dir / relative
         if destination.exists() or destination.is_symlink():
             raise ValueError("Extra source path overlaps another source: " + extra["path"])
-        extra_archive = download_source_archive(
+        extra_archive = download_archive(
             extra, workspace, "extra-source-{}.tar.gz".format(index)
         )
         extract_source_archive(extra_archive, destination, extra["strip_prefix"])
@@ -353,7 +381,17 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
     package_root_in_archive.mkdir(parents=True)
     build_dir = output_dir / "build"
     build_dir.mkdir()
-    prepared_source, patches = apply_patches(package_root, metadata, source_dir, build_dir)
+    prebuilt = metadata.get("prebuilt")
+    if prebuilt is not None:
+        archive = prebuilt["targets"][target_id]
+        prepared_source = build_dir / "input"
+        prepared_source.mkdir()
+        download_archive(archive, prepared_source, "upstream.rpm")
+        upstream = {**archive, "revision": prebuilt["revision"], "format": "rpm"}
+        patches = []
+    else:
+        prepared_source, patches = apply_patches(package_root, metadata, source_dir, build_dir)
+        upstream = upstream_record(metadata, source_revision_sha)
     context = RecipeContext(
         source_dir=prepared_source,
         build_dir=build_dir / "cmake",
@@ -372,11 +410,26 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
     recipe = load_recipe(recipe_path)
     recipe(context)
 
-    license_source = prepared_source / safe_relative(metadata["license"]["source_path"], "license.source_path")
-    if not license_source.is_file():
-        raise ValueError("Package license file is missing: " + str(license_source))
     license_path = "share/licenses/{}/LICENSE".format(metadata["name"])
-    context.install(license_source, license_path)
+    license_files = {"LICENSE": metadata["license"]["source_path"]}
+    if "notice_path" in metadata["license"]:
+        license_files["NOTICE"] = metadata["license"]["notice_path"]
+    for filename, relative in license_files.items():
+        relative = safe_relative(relative, "package license")
+        source = (package_root if prebuilt is not None else prepared_source) / relative
+        if not source.is_file():
+            raise ValueError("Package license file is missing: " + str(source))
+        if prebuilt is not None:
+            copied = context.build_dir / filename
+            shutil.copyfile(source, copied)
+            source = copied
+        context.install(source, "share/licenses/{}/{}".format(metadata["name"], filename))
+
+    if prebuilt is not None:
+        for relative, checksum in archive["files"].items():
+            file = context.stage_dir / safe_relative(relative, "prebuilt file")
+            if not file.is_file() or sha256(file) != checksum:
+                raise ValueError("Repacked binary SHA256 mismatch: " + relative)
 
     expected = required_artifacts(metadata, profile["family"])
     missing = [path for path in expected if not (context.stage_dir / path).is_file()]
@@ -390,7 +443,7 @@ def binary_artifact(package_root, metadata, source_revision_sha, source_dir,
         "artifact_type": "binary",
         "release_timestamp": release_timestamp,
         "seekdb_deps_commit": repo_sha,
-        "upstream": upstream_record(metadata, source_revision_sha),
+        "upstream": upstream,
         "patches": patches,
         "target": profile,
         "build_environment": context.observed_build_environment,
@@ -434,9 +487,19 @@ def main():
     profile = target_profile(target) if target else None
     if target and target not in metadata.get("supported_targets", [target]):
         raise ValueError("Package {} does not support target {}".format(args.name, target))
-    build_environment = initialize_build_environment(
-        profile, metadata.get("build_dependencies", {}).get(profile["family"], {})
-    ) if profile else None
+    prebuilt = metadata.get("prebuilt")
+    if prebuilt is not None:
+        if args.kind != "binary":
+            raise ValueError("Prebuilt packages require --kind binary")
+        build_environment = {
+            "environment": dict(os.environ),
+            "cmake_args": [],
+            "observed": {"host": detect_host(), "target_id": target, "mode": "repack"},
+        }
+    else:
+        build_environment = initialize_build_environment(
+            profile, metadata.get("build_dependencies", {}).get(profile["family"], {})
+        ) if profile else None
     repo_sha, repo_checkout = repository_commit()
     output_dir = Path(args.output).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -453,9 +516,11 @@ def main():
     artifacts = []
     with tempfile.TemporaryDirectory(prefix=".seekdb-deps-", dir=str(output_dir)) as temporary:
         temporary = Path(temporary)
-        source_revision_sha, source_dir = source_revision(
-            package_root, metadata, repo_checkout, temporary / "upstream"
-        )
+        source_revision_sha, source_dir = None, None
+        if prebuilt is None:
+            source_revision_sha, source_dir = source_revision(
+                package_root, metadata, repo_checkout, temporary / "upstream"
+            )
         artifact_output = temporary / "artifacts"
         artifact_output.mkdir()
         if args.kind in ("source", "both"):
