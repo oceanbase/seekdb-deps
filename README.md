@@ -76,6 +76,19 @@ objects against the staged libraries and runs it beside the staged OpenMP DLL.
 Roaring remains a separate consumer dependency; the check uses VSAG's build-tree
 Roaring archive. The manifest records success as `windows_link_check: passed`.
 
+## Bison and Flex
+
+Each `bison-flex` archive contains both parser generators and Bison's grammar
+skeletons. Choose the package for the build host. Android, iOS, and Wasm builds
+use the Linux or macOS host tools to generate C sources.
+
+- `2.4.1-2.5.35` builds GNU Bison 2.4.1 and Flex 2.5.35 for Linux x86_64,
+  Linux aarch64, and macOS arm64. GNU m4 and make are required to build the
+  package. At runtime, keep GNU m4 on `PATH` and point `BISON_PKGDATADIR` at
+  the extracted `share/bison` directory.
+- `2.5.25` builds WinFlexBison 2.5.25 for Windows x86_64 with the static MSVC
+  runtime. Keep `bin/data` alongside `bin/win_bison.exe`.
+
 ## Windows Rust CI image
 
 The `linux/amd64` image at `ghcr.io/oceanbase/seekdb-rust-windows-gnu` provides
