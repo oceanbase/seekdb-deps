@@ -16,15 +16,16 @@ def build(ctx):
     for source, directory in ((ctx.source_dir, bison_build), (flex_source, flex_build)):
         directory.mkdir()
         ctx.run([
-            source / "configure", "--build=" + triple, "--prefix=/", "--disable-nls",
+            source / "configure", "--build=" + triple, "--host=" + triple,
+            "--prefix=/", "--disable-nls",
         ], cwd=directory, env=env)
 
     make = ["make", "-j", str(ctx.jobs)]
-    ctx.run([*make, "-C", "lib"], cwd=bison_build)
-    ctx.run([*make, "-C", "src", "bison"], cwd=bison_build)
+    ctx.run([*make, "-C", "lib"], cwd=bison_build, env=env)
+    ctx.run([*make, "-C", "src", "bison"], cwd=bison_build, env=env)
     installed = bison_build / "installed"
-    ctx.run(["make", "-C", "data", "install-data", "DESTDIR=" + str(installed)], cwd=bison_build)
-    ctx.run([*make, "flex"], cwd=flex_build)
+    ctx.run(["make", "-C", "data", "install-data", "DESTDIR=" + str(installed)], cwd=bison_build, env=env)
+    ctx.run([*make, "flex"], cwd=flex_build, env=env)
 
     ctx.install(bison_build / "src/bison", "bin/bison")
     ctx.install(flex_build / "flex", "bin/flex")

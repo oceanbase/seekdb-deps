@@ -438,7 +438,7 @@ def initialize_build_environment(profile, build_dependencies=None):
         observed.update({"emscripten_version": version, "emsdk": str(emsdk),
                          "features": abi["features"]})
     elif family == "windows":
-        toolset = env.get("VCToolsVersion", "")
+        toolset = env.get("VCToolsVersion") or env.get("VCTOOLSVERSION", "")
         version = _version_tuple(toolset) if toolset else ()
         if not version or not _version_at_least(version, MINIMUM_WINDOWS_TOOLSET_VERSION):
             raise ValueError(

@@ -28,7 +28,8 @@
   },
   "recipe": "recipes/build.py",
   "patches": [
-    "patches/aarch64-config-sub.patch"
+    "patches/aarch64-config-sub.patch",
+    "patches/ansi-header-probe.patch"
   ],
   "license": {
     "spdx_id": "GPL-3.0-or-later AND BSD-3-Clause-flex",
