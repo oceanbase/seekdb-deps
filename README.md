@@ -91,10 +91,10 @@ use the Linux or macOS host tools to generate C sources.
 
 ## OBShell
 
-The `obshell` 4.5.1.3 package extracts `bin/obshell` from the pinned EL7
-RPM for each Linux architecture. Use the existing **Build dependency packages**
-workflow with `package=obshell`, `version=4.5.1.3`, `kind=binary`, and
-`target=all`.
+The `obshell` package extracts `bin/obshell` from a pinned EL7 RPM for
+each supported Linux architecture. In the **Build dependency packages**
+workflow, set `package=obshell`, `kind=binary`, and `target=all`. For
+`version`, use a directory name under `packages/obshell/`.
 
 The recipe requires `rpm2cpio`, `cpio`, and `readelf` on Linux. It verifies
 the RPM and executable SHA-256 values, checks the ELF architecture and glibc
