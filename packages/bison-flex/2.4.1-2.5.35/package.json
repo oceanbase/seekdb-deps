@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "name": "bison-flex",
+  "version": "2.4.1-2.5.35",
+  "supported_targets": [
+    "linux-x86_64-glibc217",
+    "linux-aarch64-glibc217",
+    "macos-arm64-min13"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://ftp.gnu.org/gnu/bison/bison-2.4.1.tar.bz2",
+    "repository": "https://git.savannah.gnu.org/git/bison.git",
+    "tag": "v2.4.1",
+    "revision": "41930e7ad89f9a889b1c00fbd2842dded01ada1a",
+    "archive_sha256": "2354469782149e36c644ae7c3e5105895424ed21cda5c05b591cb3dc17068e6b",
+    "strip_prefix": "bison-2.4.1",
+    "extra_archives": [
+      {
+        "path": "flex-2.5.35",
+        "url": "https://src.fedoraproject.org/lookaside/pkgs/flex/flex-2.5.35.tar.bz2/10714e50cea54dc7a227e3eddcd44d57/flex-2.5.35.tar.bz2",
+        "repository": "https://github.com/westes/flex.git",
+        "revision": "1adb7e921e198f4ac4a3024ed6934a034ecf8b60",
+        "archive_sha256": "0becbd4b2b36b99c67f8c22ab98f7f80c9860aec70f0350a0018f29a88704e7b",
+        "strip_prefix": "flex-2.5.35"
+      }
+    ]
+  },
+  "recipe": "recipes/build.py",
+  "patches": [
+    "patches/aarch64-config-sub.patch",
+    "patches/ansi-header-probe.patch"
+  ],
+  "license": {
+    "spdx_id": "GPL-3.0-or-later AND BSD-3-Clause-flex",
+    "source_path": "COPYING"
+  },
+  "required_artifacts": {
+    "default": [
+      "bin/bison",
+      "bin/flex",
+      "share/bison/yacc.c",
+      "share/bison/m4sugar/m4sugar.m4",
+      "share/licenses/bison-flex/FLEX-LICENSE"
+    ]
+  },
+  "build_dependencies": {
+    "linux": {
+      "system_packages": [
+        "m4"
+      ]
+    }
+  }
+}

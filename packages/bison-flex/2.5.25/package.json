@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "name": "bison-flex",
+  "version": "2.5.25",
+  "supported_targets": [
+    "windows-x86_64-mt"
+  ],
+  "source": {
+    "path": "source",
+    "url": "https://codeload.github.com/lexxmark/winflexbison/tar.gz/refs/tags/v2.5.25",
+    "repository": "https://github.com/lexxmark/winflexbison.git",
+    "tag": "v2.5.25",
+    "revision": "1176da2adaf972b2216b1ac8dd611e128fe80bc5",
+    "archive_sha256": "8e1b71e037b524ba3f576babb0cf59182061df1f19cd86112f085a882560f60b",
+    "strip_prefix": "winflexbison-2.5.25"
+  },
+  "recipe": "recipes/build.py",
+  "patches": [],
+  "license": {
+    "spdx_id": "GPL-3.0-or-later AND BSD-3-Clause-flex",
+    "source_path": "COPYING"
+  },
+  "required_artifacts": {
+    "windows": [
+      "bin/win_bison.exe",
+      "bin/win_flex.exe",
+      "bin/data/skeletons/yacc.c",
+      "bin/data/m4sugar/m4sugar.m4",
+      "share/licenses/bison-flex/FLEX-LICENSE"
+    ]
+  }
+}
