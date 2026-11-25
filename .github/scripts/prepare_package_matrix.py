@@ -72,6 +72,7 @@ def add_build_dependencies(targets, metadata):
         raise SystemExit("Invalid Linux system package requirement")
     selected = [dict(target) for target in targets]
     for target in selected:
+        target["prebuilt"] = "prebuilt" in metadata
         if target["family"] == "linux":
             target["conda_extra"] = " ".join(
                 "{}_linux-{}={}".format(EXTRA_LINUX_COMPILERS[name],
@@ -101,7 +102,10 @@ def main():
     metadata_path = Path("packages") / package / version / "package.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     supported_targets = metadata.get("supported_targets", [target["id"] for target in TARGETS])
-    requested_target = "all" if os.environ["REQUESTED_KIND"] == "source" else os.environ["REQUESTED_TARGET"]
+    kind = os.environ["REQUESTED_KIND"]
+    if "prebuilt" in metadata and kind != "binary":
+        raise SystemExit("Prebuilt packages require kind=binary")
+    requested_target = "all" if kind == "source" else os.environ["REQUESTED_TARGET"]
     targets = add_build_dependencies(selected_targets(requested_target, supported_targets), metadata)
     timestamp = release_timestamp(os.environ["REQUESTED_TIMESTAMP"])
     repository_sha = os.environ["REPOSITORY_SHA"]

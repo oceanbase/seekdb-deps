@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
-        if: ${{ matrix.target.family != 'linux' }}
+        if: ${{ matrix.target.family != 'linux' || matrix.target.prebuilt }}
         with:
           python-version: '3.11'
 
@@ -152,7 +152,7 @@ jobs:
         run: '"MSYS2_LOCATION=$env:MSYS2_LOCATION" >> $env:GITHUB_ENV'
 
       - uses: mamba-org/setup-micromamba@v3
-        if: ${{ matrix.target.family == 'linux' }}
+        if: ${{ matrix.target.family == 'linux' && !matrix.target.prebuilt }}
         with:
           environment-name: build
           create-args: >-
@@ -206,8 +206,15 @@ jobs:
           IFS=: read -ra path_entries <<< "$PATH"
           printf '%s\n' "${path_entries[@]}" >> "$GITHUB_PATH"
 
+      - name: Repack existing binary
+        if: ${{ matrix.target.prebuilt }}
+        run: >-
+          python scripts/package.py "$PACKAGE_NAME" "$PACKAGE_VERSION"
+          --kind binary --target "$TARGET_PROFILE" --timestamp "$RELEASE_TIMESTAMP"
+          --output dist
+
       - name: Build Linux binary
-        if: ${{ matrix.target.family == 'linux' }}
+        if: ${{ matrix.target.family == 'linux' && !matrix.target.prebuilt }}
         shell: bash -el {0}
         env:
           CC: ${{ matrix.target.compiler_prefix }}-cc

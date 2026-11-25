@@ -89,6 +89,18 @@ use the Linux or macOS host tools to generate C sources.
 - `2.5.25` builds WinFlexBison 2.5.25 for Windows x86_64 with the static MSVC
   runtime. Keep `bin/data` alongside `bin/win_bison.exe`.
 
+## OBShell
+
+The `obshell` package extracts `bin/obshell` from a pinned EL7 RPM for
+each supported Linux architecture. In the **Build dependency packages**
+workflow, set `package=obshell`, `kind=binary`, and `target=all`. For
+`version`, use a directory name under `packages/obshell/`.
+
+The recipe requires `rpm2cpio`, `cpio`, and `readelf` on Linux. It verifies
+the RPM and executable SHA-256 values, checks the ELF architecture and glibc
+requirement, and records the upstream RPM and source revision in the manifest.
+The archive includes the original executable, license, and notices.
+
 ## Windows Rust CI image
 
 The `linux/amd64` image at `ghcr.io/oceanbase/seekdb-rust-windows-gnu` provides
