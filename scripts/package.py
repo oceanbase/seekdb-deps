@@ -2,6 +2,7 @@
 """Build pinned dependency source bundles and platform-specific binary packages."""
 
 import argparse
+import bz2
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -159,10 +160,24 @@ def download_source_archive(source, workspace, filename="upstream-source.tar.gz"
 
 def extract_source_archive(archive_path, destination, strip_prefix):
     destination.mkdir(parents=True)
-    run([
-        "tar", "-xf", archive_path, "-C", destination,
-        "--strip-components", str(len(PurePosixPath(strip_prefix).parts)),
-    ])
+    plain_archive = None
+    try:
+        if os.name == "nt":
+            with archive_path.open("rb") as source:
+                is_bzip2 = source.read(3) == b"BZh"
+            if is_bzip2:
+                # Avoid the Windows tar bzip2 extraction hang.
+                plain_archive = archive_path.with_name(archive_path.name + ".uncompressed.tar")
+                with bz2.open(archive_path, "rb") as source, plain_archive.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                archive_path = plain_archive
+        run([
+            "tar", "-xf", archive_path, "-C", destination,
+            "--strip-components", str(len(PurePosixPath(strip_prefix).parts)),
+        ])
+    finally:
+        if plain_archive is not None:
+            plain_archive.unlink(missing_ok=True)
     return destination
 
 
